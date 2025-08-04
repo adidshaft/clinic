@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Clinic Dashboard</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .appointment { margin-bottom: 10px; border: 1px solid #ddd; padding: 10px; }
+    button { margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Doctor's Dashboard</h1>
+
+  <h2>Appointments</h2>
+  {% for appt in appointments %}
+    <div class="appointment">
+      <strong>{{ appt.patient }}</strong> — {{ appt.time }} <br>
+      <em>Reason: {{ appt.reason }}</em>
+    </div>
+  {% endfor %}
+
+  <h2>AI Agent Input</h2>
+  <textarea id="input" rows="3" cols="50" placeholder="Tell the AI agent to block time or reschedule..."></textarea><br>
+  <button onclick="speak()">🎤 Speak</button>
+  <button onclick="send()">Submit</button>
+
+  <p><strong>Response:</strong> <span id="response"></span></p>
+
+  <script>
+    function speak() {
+      const recognition = new webkitSpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.onresult = function (event) {
+        document.getElementById("input").value = event.results[0][0].transcript;
+      };
+      recognition.start();
+    }
+
+    async function send() {
+      const message = document.getElementById("input").value;
+      const res = await fetch("/api/clinic-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message })
+      });
+      const data = await res.json();
+      document.getElementById("response").innerText = data.response;
+    }
+  </script>
+</body>
+</html>

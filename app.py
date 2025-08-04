@@ -34,6 +34,43 @@ def ask():
 
     return jsonify({"response": response.choices[0].message.content})
 
+@app.route('/clinic')
+def clinic_dashboard():
+    # Temporary static data
+    appointments = [
+        {"patient": "John Doe", "time": "2025-08-05 10:00 AM", "reason": "fever"},
+        {"patient": "Jane Smith", "time": "2025-08-05 11:30 AM", "reason": "back pain"},
+    ]
+    return render_template("clinic.html", appointments=appointments)
+
+@app.route('/api/clinic-ai', methods=['POST'])
+def clinic_ai():
+    data = request.json
+    msg = data.get("message", "").lower()
+
+    # Simple simulation without OpenAI
+    if "block" in msg and "tomorrow" in msg:
+        return jsonify({"response": "Tomorrow has been blocked from 2pm to 4pm."})
+    elif "reschedule" in msg:
+        return jsonify({"response": "Appointment rescheduled as requested."})
+    elif "cancel" in msg:
+        return jsonify({"response": "Appointment cancelled."})
+
+    # Fallback OpenAI (very minimal usage)
+    prompt = f"The doctor said: '{msg}'. What action should we take on the schedule?"
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You assist doctors in managing appointments at a clinic."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        reply = response.choices[0].message.content
+    except Exception as e:
+        reply = f"(AI failed. Error: {e})"
+
+    return jsonify({"response": reply})
 
 
 if __name__ == '__main__':
