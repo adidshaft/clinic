@@ -15,14 +15,19 @@ def home():
 @app.route('/api/ask', methods=['POST'])
 def ask():
     user_input = request.json.get("message")
+    print("USER INPUT:", user_input)
+
     response = openai.ChatCompletion.create(
-        model="gpt-4",
+        model="gpt-4",  # or "gpt-3.5-turbo"
         messages=[
             {"role": "system", "content": "You are a helpful medical booking assistant."},
             {"role": "user", "content": user_input}
         ]
     )
+    print("GPT RESPONSE:", response)
+
     return jsonify({"response": response.choices[0].message.content})
+
 
 if __name__ == '__main__':
     app.run(debug=True)
