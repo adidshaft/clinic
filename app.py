@@ -18,21 +18,22 @@ def index():
 
 @app.route('/api/ask', methods=['POST'])
 def ask():
-    user_input = request.json.get("message")
+    data = request.json
+    user_input = data.get("message")
+    location = data.get("location", "unknown")
 
-    try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",  # or "gpt-4" if you're using GPT-4
-            messages=[
-                {"role": "system", "content": "You are a helpful medical appointment assistant."},
-                {"role": "user", "content": user_input}
-            ]
-        )
-        return jsonify({"response": response.choices[0].message.content})
+    prompt = f"User said: '{user_input}'\nTheir location is: {location}.\nRecommend a nearby doctor and time."
 
-    except Exception as e:
-        print("Error:", e)
-        return jsonify({"error": str(e)}), 500
+    response = openai.ChatCompletion.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": "You are a helpful AI that books appointments at local clinics."},
+            {"role": "user", "content": prompt}
+        ]
+    )
+
+    return jsonify({"response": response.choices[0].message.content})
+
 
 if __name__ == '__main__':
     app.run(debug=True)
