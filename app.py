@@ -9,6 +9,10 @@ load_dotenv()
 # Initialize Flask app
 app = Flask(__name__)
 
+# In-memory storage for appointments
+appointments = []
+
+
 # Initialize OpenAI client (for SDK v1.x)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -22,26 +26,28 @@ def ask():
     user_input = data.get("message")
     location = data.get("location", "unknown")
 
-    prompt = f"User said: '{user_input}'\nTheir location is: {location}.\nRecommend a nearby doctor and time."
+    # Basic parsing: simulate extracting name, time, reason
+    name = "New Patient"
+    reason = user_input
+    time = "Tomorrow 10 AM"  # Default placeholder
 
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "You are a helpful AI that books appointments at local clinics."},
-            {"role": "user", "content": prompt}
-        ]
-    )
+    # Append to shared appointment list
+    appointments.append({
+        "patient": name,
+        "time": time,
+        "reason": reason,
+        "location": location
+    })
 
-    return jsonify({"response": response.choices[0].message.content})
+    response_text = f"Your appointment for '{reason}' is tentatively booked for {time}. We'll notify you once confirmed."
+
+    return jsonify({"response": response_text})
+
 
 @app.route('/clinic')
 def clinic_dashboard():
-    # Temporary static data
-    appointments = [
-        {"patient": "John Doe", "time": "2025-08-05 10:00 AM", "reason": "fever"},
-        {"patient": "Jane Smith", "time": "2025-08-05 11:30 AM", "reason": "back pain"},
-    ]
     return render_template("clinic.html", appointments=appointments)
+
 
 @app.route('/api/clinic-ai', methods=['POST'])
 def clinic_ai():
