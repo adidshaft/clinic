@@ -24,7 +24,7 @@ def ask():
 
     prompt = f"User said: '{user_input}'\nTheir location is: {location}.\nRecommend a nearby doctor and time."
 
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-4",
         messages=[
             {"role": "system", "content": "You are a helpful AI that books appointments at local clinics."},
@@ -33,6 +33,7 @@ def ask():
     )
 
     return jsonify({"response": response.choices[0].message.content})
+
 
 
 if __name__ == '__main__':
