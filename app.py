@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, jsonify
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from openai import OpenAI
 import os
 
@@ -8,6 +9,48 @@ load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
+
+app.secret_key = "your-secret-key"
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "login"
+
+# Temporary doctor store
+doctors = {
+    "drlee": "password123",
+    "drsmith": "clinicpass"
+}
+
+# User Class
+class Doctor(UserMixin):
+    def __init__(self, id):
+        self.id = id
+
+@login_manager.user_loader
+def load_user(user_id):
+    return Doctor(user_id)
+
+
+@app.route('/login', methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+        if doctors.get(username) == password:
+            user = Doctor(username)
+            login_user(user)
+            return redirect(url_for("clinic_dashboard"))
+        else:
+            return "Invalid credentials", 401
+    return render_template("login.html")
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for("login"))
+
 
 # In-memory storage for appointments
 appointments = []
@@ -36,8 +79,10 @@ def ask():
         "patient": name,
         "time": time,
         "reason": reason,
-        "location": location
+        "location": location,
+        "doctor_id": current_user.get_id() if current_user.is_authenticated else "drlee"
     })
+
 
     response_text = f"Your appointment for '{reason}' is tentatively booked for {time}. We'll notify you once confirmed."
 
@@ -45,8 +90,12 @@ def ask():
 
 
 @app.route('/clinic')
+@login_required
 def clinic_dashboard():
-    return render_template("clinic.html", appointments=appointments)
+    doc_id = current_user.get_id()
+    filtered = [a for a in appointments if a.get("doctor_id") == doc_id]
+    return render_template("clinic.html", appointments=filtered)
+
 
 
 @app.route('/api/clinic-ai', methods=['POST'])
