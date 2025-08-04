@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, request, jsonify, render_template, redirect, url_for
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from openai import OpenAI
 import os
@@ -50,6 +50,11 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for("login"))
+
+
+@app.errorhandler(500)
+def internal_error(e):
+    return f"Something broke: {str(e)}", 500
 
 
 # In-memory storage for appointments
