@@ -2,10 +2,19 @@ from flask import Flask, request, jsonify, render_template, redirect, url_for
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from openai import OpenAI
 import os
+import datetime
+import json
+import google.oauth2.credentials
+import google_auth_oauthlib.flow
+import googleapiclient.discovery
 
 # Load environment variable (optional: only needed locally)
 from dotenv import load_dotenv
 load_dotenv()
+
+SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+CLIENT_SECRETS_FILE = 'client_secret.json'
+
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -30,6 +39,51 @@ class Doctor(UserMixin):
 @login_manager.user_loader
 def load_user(user_id):
     return Doctor(user_id)
+
+
+@app.route('/authorize')
+@login_required
+def authorize():
+    flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
+        CLIENT_SECRETS_FILE,
+        scopes=SCOPES
+    )
+    flow.redirect_uri = url_for('oauth2callback', _external=True)
+
+    authorization_url, state = flow.authorization_url(
+        access_type='offline',
+        include_granted_scopes='true'
+    )
+
+    session['state'] = state
+    return redirect(authorization_url)
+
+@app.route('/oauth2callback')
+@login_required
+def oauth2callback():
+    state = session['state']
+
+    flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
+        CLIENT_SECRETS_FILE,
+        scopes=SCOPES,
+        state=state
+    )
+    flow.redirect_uri = url_for('oauth2callback', _external=True)
+
+    flow.fetch_token(authorization_response=request.url)
+
+    credentials = flow.credentials
+    session['credentials'] = {
+        'token': credentials.token,
+        'refresh_token': credentials.refresh_token,
+        'token_uri': credentials.token_uri,
+        'client_id': credentials.client_id,
+        'client_secret': credentials.client_secret,
+        'scopes': credentials.scopes
+    }
+
+    return redirect(url_for('clinic_dashboard'))
+
 
 
 @app.route('/login', methods=["GET", "POST"])

@@ -1,58 +1,51 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>Clinic Dashboard</title>
+  <title>Doctor Dashboard</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; }
-    .appointment { margin-bottom: 10px; border: 1px solid #ddd; padding: 10px; }
-    button { margin-top: 10px; }
+    body { font-family: sans-serif; margin: 2rem; }
+    .appointment { border: 1px solid #ccc; padding: 1rem; margin-bottom: 1rem; border-radius: 6px; }
+    h2 { margin-top: 2rem; }
+    a { color: blue; text-decoration: underline; }
   </style>
 </head>
 <body>
 
-    <p>Logged in as <strong>{{ current_user.id }}</strong> | <a href="/logout">Logout</a></p>
-
-  <h1>Doctor's Dashboard</h1>
-
-  <h2>Live Appointments (from real users)</h2>
-
+  <p>
+    Logged in as <strong>{{ current_user.id }}</strong>
+    | <a href="/logout">Logout</a>
+  </p>
 
   <h2>Appointments</h2>
-  {% for appt in appointments %}
-    <div class="appointment">
-      <strong>{{ appt.patient }}</strong> — {{ appt.time }} <br>
-      <em>Reason: {{ appt.reason }}</em>
-    </div>
-  {% endfor %}
+  {% if appointments %}
+    {% for appt in appointments %}
+      <div class="appointment">
+        <strong>{{ appt.patient }}</strong> — {{ appt.time }} <br>
+        <em>Reason:</em> {{ appt.reason }} <br>
+        <small><em>Location:</em> {{ appt.location }}</small>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p>No appointments yet.</p>
+  {% endif %}
+
+  <h2>Google Calendar (Next 24 hrs)</h2>
+  {% if free_busy %}
+    <ul>
+      {% for slot in free_busy %}
+        <li>
+          <strong>{{ slot.summary }}</strong>:<br>
+          {{ slot.start }} → {{ slot.end }}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No upcoming events found.</p>
+    <p><a href="/authorize">Connect your Google Calendar</a></p>
+  {% endif %}
 
   <h2>AI Agent Input</h2>
-  <textarea id="input" rows="3" cols="50" placeholder="Tell the AI agent to block time or reschedule..."></textarea><br>
-  <button onclick="speak()">🎤 Speak</button>
-  <button onclick="send()">Submit</button>
+  <p>[Feature placeholder: You can add more AI features here later]</p>
 
-  <p><strong>Response:</strong> <span id="response"></span></p>
-
-  <script>
-    function speak() {
-      const recognition = new webkitSpeechRecognition();
-      recognition.lang = 'en-US';
-      recognition.onresult = function (event) {
-        document.getElementById("input").value = event.results[0][0].transcript;
-      };
-      recognition.start();
-    }
-
-    async function send() {
-      const message = document.getElementById("input").value;
-      const res = await fetch("/api/clinic-ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message })
-      });
-      const data = await res.json();
-      document.getElementById("response").innerText = data.response;
-    }
-  </script>
 </body>
 </html>
