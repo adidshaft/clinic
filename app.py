@@ -25,7 +25,7 @@ def ask():
     prompt = f"User said: '{user_input}'\nTheir location is: {location}.\nRecommend a nearby doctor and time."
 
     response = client.chat.completions.create(
-        model="gpt-4",
+        model="gpt-3.5-turbo",
         messages=[
             {"role": "system", "content": "You are a helpful AI that books appointments at local clinics."},
             {"role": "user", "content": prompt}
