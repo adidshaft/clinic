@@ -1,59 +1,65 @@
 let userLocation = "";
+let pendingAppointment = null;
 
-// ========== Get Location ==========
 if (navigator.geolocation) {
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      userLocation = `${position.coords.latitude},${position.coords.longitude}`;
-    },
-    () => {
-      alert("Location access denied. Please enable it for better results.");
-    }
-  );
+  navigator.geolocation.getCurrentPosition((position) => {
+    userLocation = `Latitude: ${position.coords.latitude}, Longitude: ${position.coords.longitude}`;
+  }, () => {
+    alert("Location access denied. Please enable it for better results.");
+  });
 } else {
   alert("Geolocation is not supported by this browser.");
 }
 
-// ========== Handle Text Input Submit ==========
 async function send() {
   const message = document.getElementById("input").value;
-  const responseBox = document.getElementById("response");
-  const confirmBtn = document.getElementById("confirm-btn");
 
   const res = await fetch("/api/ask", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       message,
-      location: userLocation,
-    }),
+      location: userLocation
+    })
   });
 
   const data = await res.json();
-  responseBox.innerText = `Response: ${data.response}`;
+  document.getElementById("response").innerText = data.response;
 
-  if (data.response && data.response.toLowerCase().includes("tentatively booked")) {
-    confirmBtn.style.display = "inline-block"; // Show confirmation button
+  if (data.confirmation_needed && data.appointment) {
+    pendingAppointment = data.appointment;
+    document.getElementById("confirmationButtons").style.display = "block";
   } else {
-    confirmBtn.style.display = "none";
+    pendingAppointment = null;
+    document.getElementById("confirmationButtons").style.display = "none";
   }
 }
 
-// ========== Handle Confirmation ==========
 async function confirmAppointment() {
-  const responseBox = document.getElementById("response");
-  const confirmBtn = document.getElementById("confirm-btn");
+  if (!pendingAppointment) return;
 
-  const res = await fetch("/api/confirm", {
+  const res = await fetch("/api/ask", {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      confirm: true,
+      appointment: pendingAppointment
+    })
   });
 
   const data = await res.json();
-  responseBox.innerText = `✅ ${data.response || data.error}`;
-  confirmBtn.style.display = "none"; // Hide after confirmation
+  document.getElementById("response").innerText = data.response;
+
+  pendingAppointment = null;
+  document.getElementById("confirmationButtons").style.display = "none";
 }
 
-// ========== Voice Input Handler ==========
+function cancelAppointment() {
+  document.getElementById("response").innerText = "❌ Okay, appointment not booked.";
+  pendingAppointment = null;
+  document.getElementById("confirmationButtons").style.display = "none";
+}
+
 function startVoice() {
   const recognition = new webkitSpeechRecognition();
   recognition.lang = "en-US";

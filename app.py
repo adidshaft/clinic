@@ -190,15 +190,50 @@ def index():
 
 @app.route('/api/ask', methods=['POST'])
 def ask():
-    data = request.json
-    user_input = data.get("message")
-    location = data.get("location", "unknown")
+    import re
+    import dateparser
 
-    # ========== Basic time parsing ==========
+    data = request.json
+    user_input = data.get("message", "")
+    location = data.get("location", "unknown")
+    confirm = data.get("confirm", False)
+    appointment_data = data.get("appointment", {})
+
+    # ===== If patient is confirming the appointment =====
+    if confirm and appointment_data:
+        try:
+            start_time = dateparser.parse(appointment_data["time"])
+            end_time = start_time + datetime.timedelta(minutes=30)
+
+            send_email_with_ics(
+                to_email="test@example.com",
+                subject="Your Clinic Appointment (Confirmed)",
+                body=f"Your appointment with {appointment_data['doctor']} at {appointment_data['time']} is confirmed.",
+                summary="Clinic Appointment",
+                start_time=start_time,
+                end_time=end_time,
+                location=appointment_data["location"]
+            )
+
+            appointments.append({
+                "patient": "New Patient",
+                "time": appointment_data["time"],
+                "reason": appointment_data["reason"],
+                "location": appointment_data["location"],
+                "doctor_id": appointment_data["doctor_id"]
+            })
+
+            return jsonify({
+                "response": f"✅ Appointment confirmed with Dr. {appointment_data['doctor']} at {appointment_data['time']}."
+            })
+
+        except Exception as e:
+            return jsonify({"error": "Could not confirm appointment"}), 400
+
+    # ===== Normal flow: Parse user input =====
     parsed_time = dateparser.parse(user_input)
     time = parsed_time.strftime("%Y-%m-%d %H:%M") if parsed_time else "Tomorrow 10 AM"
 
-    # ========== Extract doctor type ==========
     user_lower = user_input.lower()
     if "gynecologist" in user_lower or "gynecology" in user_lower:
         doctor_type = "Gynecology"
@@ -213,94 +248,29 @@ def ask():
     else:
         doctor_type = "General Physician"
 
-    # ========== Extract reason ==========
     reason_match = re.search(r"(?:for|about|with|have|need)\s(.+)", user_lower)
     reason = reason_match.group(1).capitalize() if reason_match else doctor_type + " consultation"
 
-    # ========== Match a doctor ==========
     matched_doctor = find_doctor(location, doctor_type)
-
     if not matched_doctor:
         return jsonify({
             "response": "We couldn’t match a doctor right now based on your location and issue. Our team will get back to you shortly."
         }), 200
 
-    # ========== Save to pending session ==========
-    session['pending_appointment'] = {
-        "patient": "New Patient",
+    # ===== Propose appointment, wait for confirmation =====
+    proposed_appointment = {
         "time": time,
         "reason": reason,
         "location": location,
-        "doctor": matched_doctor['name'],
-        "doctor_id": matched_doctor["id"],
-        "doctor_email": matched_doctor.get("email", "doctor@example.com"),
-        "patient_email": "test@example.com"  # Replace with actual
+        "doctor": matched_doctor["name"],
+        "doctor_id": matched_doctor["id"]
     }
 
-    # ========== Ask for confirmation ==========
-    response_text = (
-        f"Do you want to confirm an appointment with Dr. {matched_doctor['name']} "
-        f"for '{reason}' at {time}? Reply with 'yes' to confirm."
-    )
-
-    return jsonify({"response": response_text})
-
-@app.route('/api/confirm', methods=['POST'])
-def confirm():
-    from flask import session
-
-    data = session.get("pending_appointment")
-
-    if not data:
-        return jsonify({"response": "No pending appointment found. Please start over."}), 400
-
-    try:
-        start_time = dateparser.parse(data['time'])
-        if not start_time:
-            return jsonify({"error": "Could not parse time."}), 400
-
-        end_time = start_time + datetime.timedelta(minutes=30)
-
-        # Send ICS to patient
-        send_email_with_ics(
-            to_email=data["patient_email"],
-            subject="Your Clinic Appointment",
-            body=f"Your appointment with Dr. {data['doctor']} is confirmed for {data['time']}",
-            summary="Clinic Appointment",
-            start_time=start_time,
-            end_time=end_time,
-            location=data["location"]
-        )
-
-        # Send ICS to doctor
-        send_email_with_ics(
-            to_email=data["doctor_email"],
-            subject="New Patient Appointment",
-            body=f"You have a new appointment with a patient at {data['time']}",
-            summary="New Appointment",
-            start_time=start_time,
-            end_time=end_time,
-            location=data["location"]
-        )
-
-        # Save appointment
-        appointments.append({
-            "patient": data["patient"],
-            "time": data["time"],
-            "reason": data["reason"],
-            "location": data["location"],
-            "doctor_id": data["doctor_id"]
-        })
-
-        # Clear session
-        session.pop("pending_appointment", None)
-
-        return jsonify({
-            "response": f"Your appointment with Dr. {data['doctor']} for '{data['reason']}' is confirmed at {data['time']}."
-        })
-
-    except Exception as e:
-        return jsonify({"error": f"Something went wrong: {str(e)}"}), 500
+    return jsonify({
+        "response": f"🩺 Dr. {matched_doctor['name']} is available for '{reason}' at {time}. Do you want to confirm this appointment?",
+        "confirmation_needed": True,
+        "appointment": proposed_appointment
+    })
 
 
 
