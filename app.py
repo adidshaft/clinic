@@ -139,6 +139,7 @@ def ask():
     name = "New Patient"
     reason = user_input
     time = "Tomorrow 10 AM"  # Default placeholder
+    doctor_name = "Dr. Lee"
 
     # Append to shared appointment list
     appointments.append({
@@ -163,7 +164,7 @@ def ask():
     send_email_with_ics(
         to_email=patient_email,
         subject="Your Clinic Appointment",
-        body=f"You have an appointment with {doctor} at {time}",
+        body=f"You have an appointment with {doctor_name} at {time}",
         summary="Clinic Appointment",
         start_time=start_time,
         end_time=end_time,
