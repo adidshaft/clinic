@@ -33,6 +33,24 @@ doctors = {
     "drsmith": "clinicpass"
 }
 
+# Fake doctor directory
+DOCTORS = [
+    {"id": "drlee", "name": "Dr. Lee", "specialty": "headache", "location": "central"},
+    {"id": "drchua", "name": "Dr. Chua", "specialty": "stomach", "location": "east"},
+    {"id": "drgoh", "name": "Dr. Goh", "specialty": "flu", "location": "north"},
+]
+
+def find_doctor(reason, location):
+    reason_lower = reason.lower()
+    location_lower = location.lower()
+
+    for doctor in DOCTORS:
+        if doctor["specialty"] in reason_lower and doctor["location"] in location_lower:
+            return doctor
+
+    return None
+
+
 # User Class
 class Doctor(UserMixin):
     def __init__(self, id):
@@ -141,14 +159,20 @@ def ask():
     time = "Tomorrow 10 AM"  # Default placeholder
     doctor_name = "Dr. Lee"
 
-    # Append to shared appointment list
+    matched_doctor = find_doctor(reason, location)
+
+    if not matched_doctor:
+        return jsonify({"response": "We couldn’t match a doctor right now based on your location and issue. Our team will get back to you shortly."})
+
     appointments.append({
         "patient": name,
         "time": time,
         "reason": reason,
         "location": location,
-        "doctor_id": current_user.get_id() if current_user.is_authenticated else "drlee"
+        "doctor_id": matched_doctor["id"]
     })
+
+
 
     # dummy email for now (can enhance with user input later)
     patient_email = "test@example.com"
@@ -161,6 +185,8 @@ def ask():
 
     end_time = start_time + datetime.timedelta(minutes=30)
 
+    doctor_name = matched_doctor["name"]
+
     send_email_with_ics(
         to_email=patient_email,
         subject="Your Clinic Appointment",
@@ -170,6 +196,7 @@ def ask():
         end_time=end_time,
         location=location
     )
+
 
 
     response_text = f"Your appointment for '{reason}' is tentatively booked for {time}. We'll notify you once confirmed."
