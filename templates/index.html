@@ -2,13 +2,21 @@
 <html>
 <head>
   <title>AI Clinic</title>
+  <meta charset="UTF-8" />
 </head>
 <body>
   <h2>Describe your health concern:</h2>
+
   <textarea id="input" rows="5" cols="50"></textarea><br>
+
   <button onclick="send()">Submit</button>
   <button onclick="startVoice()">🎤 Speak</button>
+
   <p><b>Response:</b> <span id="response"></span></p>
+
+  <!-- This button only shows when appointment is tentatively booked -->
+  <button id="confirm-btn" style="display: none;" onclick="confirmAppointment()">✅ Confirm Appointment</button>
+
   <script src="/static/script.js"></script>
 </body>
 </html>

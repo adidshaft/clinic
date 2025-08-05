@@ -183,9 +183,6 @@ def ask():
     location = data.get("location", "unknown")
 
     # ========== Basic time parsing ==========
-    import re
-    import dateparser
-
     parsed_time = dateparser.parse(user_input)
     time = parsed_time.strftime("%Y-%m-%d %H:%M") if parsed_time else "Tomorrow 10 AM"
 
@@ -204,7 +201,7 @@ def ask():
     else:
         doctor_type = "General Physician"
 
-    # ========== Extract reason (basic regex) ==========
+    # ========== Extract reason ==========
     reason_match = re.search(r"(?:for|about|with|have|need)\s(.+)", user_lower)
     reason = reason_match.group(1).capitalize() if reason_match else doctor_type + " consultation"
 
@@ -216,37 +213,83 @@ def ask():
             "response": "We couldn’t match a doctor right now based on your location and issue. Our team will get back to you shortly."
         }), 200
 
-    # ========== Generate ICS and send email ==========
-    patient_email = "test@example.com"
-    doctor_email = matched_doctor.get("email", "doctor@example.com")
-
-    start_time = dateparser.parse(time)
-    if not start_time:
-        return jsonify({"error": "Could not understand time format"}), 400
-    end_time = start_time + datetime.timedelta(minutes=30)
-
-    send_email_with_ics(
-        to_email=patient_email,
-        subject="Your Clinic Appointment",
-        body=f"You have an appointment with {matched_doctor['name']} at {time}",
-        summary="Clinic Appointment",
-        start_time=start_time,
-        end_time=end_time,
-        location=location
-    )
-
-    # ========== Save Appointment ==========
-    appointments.append({
+    # ========== Save to pending session ==========
+    session['pending_appointment'] = {
         "patient": "New Patient",
         "time": time,
         "reason": reason,
         "location": location,
-        "doctor_id": matched_doctor["id"]
-    })
+        "doctor": matched_doctor['name'],
+        "doctor_id": matched_doctor["id"],
+        "doctor_email": matched_doctor.get("email", "doctor@example.com"),
+        "patient_email": "test@example.com"  # Replace with actual
+    }
 
-    response_text = f"Your appointment for '{reason}' is tentatively booked with {matched_doctor['name']} at {time}. We'll notify you once confirmed."
+    # ========== Ask for confirmation ==========
+    response_text = (
+        f"Do you want to confirm an appointment with Dr. {matched_doctor['name']} "
+        f"for '{reason}' at {time}? Reply with 'yes' to confirm."
+    )
 
     return jsonify({"response": response_text})
+
+@app.route('/api/confirm', methods=['POST'])
+def confirm():
+    from flask import session
+
+    data = session.get("pending_appointment")
+
+    if not data:
+        return jsonify({"response": "No pending appointment found. Please start over."}), 400
+
+    try:
+        start_time = dateparser.parse(data['time'])
+        if not start_time:
+            return jsonify({"error": "Could not parse time."}), 400
+
+        end_time = start_time + datetime.timedelta(minutes=30)
+
+        # Send ICS to patient
+        send_email_with_ics(
+            to_email=data["patient_email"],
+            subject="Your Clinic Appointment",
+            body=f"Your appointment with Dr. {data['doctor']} is confirmed for {data['time']}",
+            summary="Clinic Appointment",
+            start_time=start_time,
+            end_time=end_time,
+            location=data["location"]
+        )
+
+        # Send ICS to doctor
+        send_email_with_ics(
+            to_email=data["doctor_email"],
+            subject="New Patient Appointment",
+            body=f"You have a new appointment with a patient at {data['time']}",
+            summary="New Appointment",
+            start_time=start_time,
+            end_time=end_time,
+            location=data["location"]
+        )
+
+        # Save appointment
+        appointments.append({
+            "patient": data["patient"],
+            "time": data["time"],
+            "reason": data["reason"],
+            "location": data["location"],
+            "doctor_id": data["doctor_id"]
+        })
+
+        # Clear session
+        session.pop("pending_appointment", None)
+
+        return jsonify({
+            "response": f"Your appointment with Dr. {data['doctor']} for '{data['reason']}' is confirmed at {data['time']}."
+        })
+
+    except Exception as e:
+        return jsonify({"error": f"Something went wrong: {str(e)}"}), 500
+
 
 
 @app.route('/clinic')
