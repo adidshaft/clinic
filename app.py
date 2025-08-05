@@ -99,13 +99,15 @@ def authorize():
     )
     flow.redirect_uri = url_for('oauth2callback', _external=True)
 
+    # 🔥 Force refresh_token issuance
     authorization_url, state = flow.authorization_url(
         access_type='offline',
-        include_granted_scopes='true'
+        prompt='consent'
     )
-
     session['state'] = state
+
     return redirect(authorization_url)
+
 
 @app.route('/oauth2callback')
 @login_required
@@ -135,8 +137,8 @@ def oauth2callback():
     print("Token:", credentials.token)
     print("Refresh:", credentials.refresh_token)
 
-
     return redirect(url_for('clinic_dashboard'))
+
 
 
 
