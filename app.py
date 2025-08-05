@@ -82,6 +82,11 @@ def oauth2callback():
         'scopes': credentials.scopes
     }
 
+    print("Successfully connected to Google Calendar")
+    print("Token:", credentials.token)
+    print("Refresh:", credentials.refresh_token)
+
+
     return redirect(url_for('clinic_dashboard'))
 
 
@@ -153,7 +158,40 @@ def ask():
 def clinic_dashboard():
     doc_id = current_user.get_id()
     filtered = [a for a in appointments if a.get("doctor_id") == doc_id]
-    return render_template("clinic.html", appointments=filtered)
+
+    free_busy = []
+    if 'credentials' in session:
+        print("⛳️ Found credentials in session")
+
+        creds = google.oauth2.credentials.Credentials(**session['credentials'])
+
+        service = googleapiclient.discovery.build('calendar', 'v3', credentials=creds)
+
+        now = datetime.datetime.utcnow().isoformat() + 'Z'
+        later = (datetime.datetime.utcnow() + datetime.timedelta(days=1)).isoformat() + 'Z'
+
+        events_result = service.events().list(
+            calendarId='primary',
+            timeMin=now,
+            timeMax=later,
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+
+        events = events_result.get('items', [])
+        print("🗓 Found events:", events)
+
+        for event in events:
+            free_busy.append({
+                'summary': event['summary'],
+                'start': event['start'].get('dateTime', event['start'].get('date')),
+                'end': event['end'].get('dateTime', event['end'].get('date'))
+            })
+    else:
+        print("⚠️ No credentials in session")
+
+    return render_template("clinic.html", appointments=filtered, free_busy=free_busy)
+
 
 
 

@@ -29,20 +29,22 @@
     <p>No appointments yet.</p>
   {% endif %}
 
-  <h2>Google Calendar (Next 24 hrs)</h2>
-  {% if free_busy %}
+  <h3>Google Calendar (Next 24 hrs)</h3>
+
+    {% if free_busy %}
     <ul>
-      {% for slot in free_busy %}
-        <li>
-          <strong>{{ slot.summary }}</strong>:<br>
-          {{ slot.start }} → {{ slot.end }}
-        </li>
-      {% endfor %}
+        {% for slot in free_busy %}
+        <li><strong>{{ slot.summary }}</strong>: {{ slot.start }} → {{ slot.end }}</li>
+        {% endfor %}
     </ul>
-  {% else %}
-    <p>No upcoming events found.</p>
+    {% else %}
+    <p>No events found. Is your calendar empty?</p>
+    {% endif %}
+
+    {% if not free_busy and not session.credentials %}
     <p><a href="/authorize">Connect your Google Calendar</a></p>
-  {% endif %}
+    {% endif %}
+
 
   <h2>AI Agent Input</h2>
   <p>[Feature placeholder: You can add more AI features here later]</p>
