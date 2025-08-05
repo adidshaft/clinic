@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from utils.email_invite import send_email_with_ics
 from openai import OpenAI
 import os
 import datetime
@@ -146,6 +147,24 @@ def ask():
         "location": location,
         "doctor_id": current_user.get_id() if current_user.is_authenticated else "drlee"
     })
+
+    # dummy email for now (can enhance with user input later)
+    patient_email = "test@example.com"
+    doctor_email = "doctor@example.com"
+
+    # Generate time slots (for ICS)
+    start_time = datetime.datetime.strptime(time, "%Y-%m-%d %H:%M")
+    end_time = start_time + datetime.timedelta(minutes=30)
+
+    send_email_with_ics(
+        to_email=patient_email,
+        subject="Your Clinic Appointment",
+        body=f"You have an appointment with {doctor} at {time}",
+        summary="Clinic Appointment",
+        start_time=start_time,
+        end_time=end_time,
+        location=location
+    )
 
 
     response_text = f"Your appointment for '{reason}' is tentatively booked for {time}. We'll notify you once confirmed."
