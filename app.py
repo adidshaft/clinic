@@ -28,10 +28,23 @@ login_manager.init_app(app)
 login_manager.login_view = "login"
 
 # Temporary doctor store
-doctors = {
-    "drlee": "password123",
-    "drsmith": "clinicpass"
-}
+doctors = [
+    {
+        "id": "drlee",
+        "name": "Dr. Sarah Lee",
+        "specialty": "General Physician",
+        "location": "singapore central",
+        "email": "drlee@example.com"
+    },
+    {
+        "id": "drkoh",
+        "name": "Dr. James Koh",
+        "specialty": "Gynecology",
+        "location": "singapore east",
+        "email": "drkoh@example.com"
+    }
+]
+
 
 # Fake doctor directory
 DOCTORS = [
@@ -40,15 +53,30 @@ DOCTORS = [
     {"id": "drgoh", "name": "Dr. Goh", "specialty": "flu", "location": "north"},
 ]
 
-def find_doctor(reason, location):
-    reason_lower = reason.lower()
-    location_lower = location.lower()
+def find_doctor(location, specialty):
+    location = location.lower().strip()
+    specialty = specialty.lower().strip()
 
-    for doctor in DOCTORS:
-        if doctor["specialty"] in reason_lower and doctor["location"] in location_lower:
-            return doctor
+    for doc in doctors:
+        doc_location = doc.get("location", "").lower()
+        doc_specialty = doc.get("specialty", "").lower()
+
+        if location in doc_location and specialty in doc_specialty:
+            return doc
+
+    # Fallback: try matching specialty only
+    for doc in doctors:
+        if specialty in doc.get("specialty", "").lower():
+            return doc
+
+    # Fallback: return a random doctor or None
+    if doctors:
+        return doctors[0]
+    
+    print(f"Looking for doctor with specialty: {specialty}, location: {location}")
 
     return None
+
 
 
 # User Class
