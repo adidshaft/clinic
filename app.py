@@ -153,7 +153,10 @@ def ask():
     doctor_email = "doctor@example.com"
 
     # Generate time slots (for ICS)
-    start_time = datetime.datetime.strptime(time, "%Y-%m-%d %H:%M")
+    start_time = dateparser.parse(time)
+    if not start_time:
+        return jsonify({"error": "Could not understand time format"}), 400
+
     end_time = start_time + datetime.timedelta(minutes=30)
 
     send_email_with_ics(
