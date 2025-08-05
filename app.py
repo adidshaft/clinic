@@ -32,19 +32,22 @@ login_manager.login_view = "login"
 doctors = [
     {
         "id": "drlee",
-        "name": "Dr. Sarah Lee",
-        "specialty": "General Physician",
-        "location": "singapore central",
-        "email": "drlee@example.com"
+        "name": "Dr. Lee",
+        "specialty": "Dermatology",
+        "location": "Singapore East",
+        "email": "drlee@example.com",
+        "password": "test123"  # 👈 Add this
     },
     {
-        "id": "drkoh",
-        "name": "Dr. James Koh",
+        "id": "drjohn",
+        "name": "Dr. John",
         "specialty": "Gynecology",
-        "location": "singapore east",
-        "email": "drkoh@example.com"
+        "location": "Singapore Central",
+        "email": "drjohn@example.com",
+        "password": "secret456"  # 👈 And this
     }
 ]
+
 
 
 # Fake doctor directory
