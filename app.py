@@ -5,6 +5,7 @@ from openai import OpenAI
 import os
 import datetime
 import json
+import re
 import dateparser
 import google.oauth2.credentials
 import google_auth_oauthlib.flow
@@ -181,53 +182,69 @@ def ask():
     user_input = data.get("message")
     location = data.get("location", "unknown")
 
-    # Basic parsing: simulate extracting name, time, reason
-    name = "New Patient"
-    reason = user_input
-    time = "Tomorrow 10 AM"  # Default placeholder
-    doctor_name = "Dr. Lee"
+    # ========== Basic time parsing ==========
+    import re
+    import dateparser
 
-    matched_doctor = find_doctor(reason, location)
+    parsed_time = dateparser.parse(user_input)
+    time = parsed_time.strftime("%Y-%m-%d %H:%M") if parsed_time else "Tomorrow 10 AM"
+
+    # ========== Extract doctor type ==========
+    user_lower = user_input.lower()
+    if "gynecologist" in user_lower or "gynecology" in user_lower:
+        doctor_type = "Gynecology"
+    elif "pediatrician" in user_lower:
+        doctor_type = "Pediatrics"
+    elif "dentist" in user_lower:
+        doctor_type = "Dentistry"
+    elif "skin" in user_lower or "dermatologist" in user_lower:
+        doctor_type = "Dermatology"
+    elif "headache" in user_lower or "fever" in user_lower or "cold" in user_lower:
+        doctor_type = "General Physician"
+    else:
+        doctor_type = "General Physician"
+
+    # ========== Extract reason (basic regex) ==========
+    reason_match = re.search(r"(?:for|about|with|have|need)\s(.+)", user_lower)
+    reason = reason_match.group(1).capitalize() if reason_match else doctor_type + " consultation"
+
+    # ========== Match a doctor ==========
+    matched_doctor = find_doctor(location, doctor_type)
 
     if not matched_doctor:
-        return jsonify({"response": "We couldn’t match a doctor right now based on your location and issue. Our team will get back to you shortly."})
+        return jsonify({
+            "response": "We couldn’t match a doctor right now based on your location and issue. Our team will get back to you shortly."
+        }), 200
 
-    appointments.append({
-        "patient": name,
-        "time": time,
-        "reason": reason,
-        "location": location,
-        "doctor_id": matched_doctor["id"]
-    })
-
-
-
-    # dummy email for now (can enhance with user input later)
+    # ========== Generate ICS and send email ==========
     patient_email = "test@example.com"
-    doctor_email = "doctor@example.com"
+    doctor_email = matched_doctor.get("email", "doctor@example.com")
 
-    # Generate time slots (for ICS)
     start_time = dateparser.parse(time)
     if not start_time:
         return jsonify({"error": "Could not understand time format"}), 400
-
     end_time = start_time + datetime.timedelta(minutes=30)
-
-    doctor_name = matched_doctor["name"]
 
     send_email_with_ics(
         to_email=patient_email,
         subject="Your Clinic Appointment",
-        body=f"You have an appointment with {doctor_name} at {time}",
+        body=f"You have an appointment with {matched_doctor['name']} at {time}",
         summary="Clinic Appointment",
         start_time=start_time,
         end_time=end_time,
         location=location
     )
 
+    # ========== Save Appointment ==========
+    appointments.append({
+        "patient": "New Patient",
+        "time": time,
+        "reason": reason,
+        "location": location,
+        "doctor_id": matched_doctor["id"]
+    })
 
-
-    response_text = f"Your appointment for '{reason}' is tentatively booked for {time}. We'll notify you once confirmed."
+    response_text = f"Your appointment for '{reason}' is tentatively booked with {matched_doctor['name']} at {time}. We'll notify you once confirmed."
 
     return jsonify({"response": response_text})
 
