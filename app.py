@@ -148,19 +148,21 @@ def oauth2callback():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+        username = request.form.get("username")
+        password = request.form.get("password")
 
-        matched_doctor = next((doc for doc in doctors if doc['id'] == username and doc['password'] == password), None)
+        # match doctor with correct credentials
+        matched_doctor = next((doc for doc in doctors if doc['id'] == username and doc.get('password') == password), None)
 
         if matched_doctor:
-            user = User(username)
+            user = Doctor(username)  # ✅ Fix: use Doctor, not User
             login_user(user)
-            return redirect(url_for('clinic_dashboard'))
+            return redirect(request.args.get("next") or url_for("clinic_dashboard"))
         else:
             return "Invalid credentials", 401
 
-    return render_template('login.html')
+    return render_template("login.html")
+
 
 
 @app.route('/logout')
