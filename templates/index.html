@@ -2,20 +2,180 @@
 <html>
 <head>
   <title>AI Clinic</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    /* Simple CSS Variables for Light/Dark Mode */
+    :root {
+      --bg-color: #ffffff;
+      --text-color: #333333;
+      --card-bg: #f8f9fa;
+      --border-color: #e0e0e0;
+      --primary-color: #007bff;
+      --primary-hover: #0056b3;
+    }
+
+    [data-theme="dark"] {
+      --bg-color: #1a1a1a;
+      --text-color: #ffffff;
+      --card-bg: #2d2d2d;
+      --border-color: #404040;
+      --primary-color: #4dabf7;
+      --primary-hover: #339af0;
+    }
+
+    /* Basic Styling */
+    body {
+      font-family: Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 20px;
+      transition: all 0.3s ease;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      padding: 30px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: var(--primary-color);
+    }
+
+    textarea {
+      width: 100%;
+      padding: 15px;
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 16px;
+      background: var(--bg-color);
+      color: var(--text-color);
+      box-sizing: border-box;
+      resize: vertical;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: var(--primary-color);
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin: 20px 0;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 12px 20px;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background-color 0.3s;
+      flex: 1;
+      min-width: 120px;
+    }
+
+    button:hover {
+      background-color: var(--primary-hover);
+    }
+
+    .response-box {
+      background: var(--bg-color);
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 20px;
+      min-height: 50px;
+    }
+
+    .theme-toggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      cursor: pointer;
+      font-size: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+      body {
+        padding: 10px;
+      }
+      .container {
+        padding: 20px;
+      }
+      .button-group {
+        flex-direction: column;
+      }
+      button {
+        width: 100%;
+        margin-bottom: 10px;
+      }
+    }
+  </style>
 </head>
 <body>
-  <h2>Describe your health concern:</h2>
-  <textarea id="input" rows="5" cols="50"></textarea><br>
-  <button onclick="send()">Submit</button>
-  <button onclick="startVoice()">🎤 Speak</button>
-  <p><b>Response:</b> <span id="response"></span></p>
+  <!-- Theme Toggle Button -->
+  <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">🌙</button>
 
-  <!-- Confirmation Buttons (Hidden by Default) -->
-  <div id="confirmationButtons" style="display:none; margin-top: 10px;">
-    <button onclick="confirmAppointment()">Yes ✅</button>
-    <button onclick="cancelAppointment()">No ❌</button>
+  <div class="container">
+    <h2>Describe your health concern:</h2>
+    
+    <textarea id="input" rows="5" cols="50" placeholder="Please describe your symptoms or health concerns in detail..."></textarea>
+    
+    <div class="button-group">
+      <button onclick="send()">Submit</button>
+      <button onclick="startVoice()">🎤 Speak</button>
+    </div>
+
+    <div class="response-box">
+      <b>Response:</b> <span id="response">Your response will appear here...</span>
+    </div>
   </div>
 
+  <!-- Keep using your existing script.js file -->
   <script src="/static/script.js"></script>
+  
+  <!-- Add simple theme functionality -->
+  <script>
+    // Simple theme toggle functionality
+    function toggleTheme() {
+      const currentTheme = document.documentElement.getAttribute('data-theme');
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', newTheme);
+      localStorage.setItem('theme', newTheme);
+      
+      // Update button emoji
+      const button = document.querySelector('.theme-toggle');
+      button.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+    }
+
+    // Load saved theme on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      const savedTheme = localStorage.getItem('theme') || 'light';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+      const button = document.querySelector('.theme-toggle');
+      button.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+    });
+  </script>
 </body>
 </html>

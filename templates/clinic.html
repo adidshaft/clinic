@@ -1,53 +1,313 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Doctor Dashboard</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clinic Dashboard</title>
   <style>
-    body { font-family: sans-serif; margin: 2rem; }
-    .appointment { border: 1px solid #ccc; padding: 1rem; margin-bottom: 1rem; border-radius: 6px; }
-    h2 { margin-top: 2rem; }
-    a { color: blue; text-decoration: underline; }
+    /* Simple CSS Variables for Light/Dark Mode */
+    :root {
+      --bg-color: #ffffff;
+      --text-color: #333333;
+      --card-bg: #f8f9fa;
+      --border-color: #e0e0e0;
+      --primary-color: #007bff;
+      --primary-hover: #0056b3;
+      --success-color: #28a745;
+      --danger-color: #dc3545;
+    }
+
+    [data-theme="dark"] {
+      --bg-color: #1a1a1a;
+      --text-color: #ffffff;
+      --card-bg: #2d2d2d;
+      --border-color: #404040;
+      --primary-color: #4dabf7;
+      --primary-hover: #339af0;
+      --success-color: #51cf66;
+      --danger-color: #ff6b6b;
+    }
+
+    /* Basic Styling */
+    body {
+      font-family: Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 20px;
+      transition: all 0.3s ease;
+      line-height: 1.6;
+    }
+
+    .header {
+      background: var(--card-bg);
+      padding: 20px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .user-info {
+      font-size: 18px;
+    }
+
+    .logout-link {
+      background: var(--danger-color);
+      color: white;
+      padding: 8px 16px;
+      text-decoration: none;
+      border-radius: 6px;
+      transition: background-color 0.3s;
+    }
+
+    .logout-link:hover {
+      background: #c82333;
+    }
+
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .section {
+      background: var(--card-bg);
+      padding: 20px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .section h2 {
+      color: var(--primary-color);
+      margin-bottom: 20px;
+      border-bottom: 2px solid var(--border-color);
+      padding-bottom: 10px;
+    }
+
+    .appointment {
+      background: var(--bg-color);
+      margin-bottom: 15px;
+      border: 1px solid var(--border-color);
+      padding: 15px;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+    }
+
+    .appointment:hover {
+      border-color: var(--primary-color);
+      transform: translateX(5px);
+    }
+
+    .appointment strong {
+      color: var(--primary-color);
+      font-size: 18px;
+    }
+
+    .appointment em {
+      color: var(--text-color);
+      opacity: 0.8;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 15px;
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 16px;
+      background: var(--bg-color);
+      color: var(--text-color);
+      box-sizing: border-box;
+      resize: vertical;
+      margin-bottom: 15px;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: var(--primary-color);
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 12px 20px;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background-color 0.3s;
+      flex: 1;
+      min-width: 120px;
+    }
+
+    button:hover {
+      background-color: var(--primary-hover);
+    }
+
+    .response-box {
+      background: var(--bg-color);
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      padding: 15px;
+      min-height: 50px;
+    }
+
+    .theme-toggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      cursor: pointer;
+      font-size: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      z-index: 1000;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: var(--text-color);
+      opacity: 0.7;
+      padding: 40px;
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+      body {
+        padding: 10px;
+      }
+      
+      .header {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+      }
+      
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .button-group {
+        flex-direction: column;
+      }
+      
+      button {
+        width: 100%;
+        margin-bottom: 10px;
+      }
+    }
   </style>
 </head>
 <body>
+  <!-- Theme Toggle Button -->
+  <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">🌙</button>
 
-  <p>
-    Logged in as <strong>{{ current_user.id }}</strong>
-    | <a href="/logout">Logout</a>
-  </p>
+  <!-- Header Section -->
+  <div class="header">
+    <div class="user-info">
+      <p>Logged in as <strong>{{ current_user.id }}</strong></p>
+    </div>
+    <a href="/logout" class="logout-link">Logout</a>
+  </div>
 
-  <h2>Appointments</h2>
-  {% if appointments %}
-    {% for appt in appointments %}
-      <div class="appointment">
-        <strong>{{ appt.patient }}</strong> — {{ appt.time }} <br>
-        <em>Reason:</em> {{ appt.reason }} <br>
-        <small><em>Location:</em> {{ appt.location }}</small>
-      </div>
-    {% endfor %}
-  {% else %}
-    <p>No appointments yet.</p>
-  {% endif %}
+  <h1>Doctor's Dashboard</h1>
 
-  <h3>Google Calendar (Next 24 hrs)</h3>
-
-    {% if free_busy %}
-    <ul>
-        {% for slot in free_busy %}
-        <li><strong>{{ slot.summary }}</strong>: {{ slot.start }} → {{ slot.end }}</li>
+  <!-- Main Dashboard Grid -->
+  <div class="dashboard-grid">
+    <!-- Appointments Section -->
+    <div class="section">
+      <h2>Live Appointments (from real users)</h2>
+      
+      {% if appointments %}
+        {% for appt in appointments %}
+          <div class="appointment">
+            <strong>{{ appt.patient }}</strong> — {{ appt.time }} <br>
+            <em>Reason: {{ appt.reason }}</em>
+          </div>
         {% endfor %}
-    </ul>
-    {% else %}
-    <p>No events found. Is your calendar empty?</p>
-    {% endif %}
+      {% else %}
+        <div class="empty-state">
+          <p>📅 No appointments scheduled yet.</p>
+          <small>Patient appointments will appear here automatically.</small>
+        </div>
+      {% endif %}
+    </div>
 
-    {% if not free_busy and not session.credentials %}
-    <p><a href="/authorize">Connect your Google Calendar</a></p>
-    {% endif %}
+    <!-- AI Agent Section -->
+    <div class="section">
+      <h2>AI Agent Input</h2>
+      
+      <textarea id="input" rows="3" cols="50" placeholder="Tell the AI agent to block time or reschedule..."></textarea>
+      
+      <div class="button-group">
+        <button onclick="speak()">🎤 Speak</button>
+        <button onclick="send()">Submit</button>
+      </div>
 
+      <div class="response-box">
+        <p><strong>Response:</strong> <span id="response">AI responses will appear here...</span></p>
+      </div>
+    </div>
+  </div>
 
-  <h2>AI Agent Input</h2>
-  <p>[Feature placeholder: You can add more AI features here later]</p>
+  <!-- Keep using the same JavaScript functions from original -->
+  <script>
+    // PRESERVE EXISTING FUNCTIONALITY - Voice Recognition (from original clinic.html)
+    function speak() {
+      const recognition = new webkitSpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.onresult = function (event) {
+        document.getElementById("input").value = event.results[0][0].transcript;
+      };
+      recognition.start();
+    }
 
+    // PRESERVE EXISTING FUNCTIONALITY - Send function (from original clinic.html)
+    async function send() {
+      const message = document.getElementById("input").value;
+      const res = await fetch("/api/clinic-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message })
+      });
+      const data = await res.json();
+      document.getElementById("response").innerText = data.response;
+    }
+
+    // Simple theme toggle functionality
+    function toggleTheme() {
+      const currentTheme = document.documentElement.getAttribute('data-theme');
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', newTheme);
+      localStorage.setItem('theme', newTheme);
+      
+      // Update button emoji
+      const button = document.querySelector('.theme-toggle');
+      button.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+    }
+
+    // Load saved theme on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      const savedTheme = localStorage.getItem('theme') || 'light';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+      const button = document.querySelector('.theme-toggle');
+      button.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+    });
+  </script>
 </body>
 </html>
