@@ -179,7 +179,200 @@
       z-index: 1000;
     }
 
-    .empty-state {
+    .calendar-section {
+      grid-column: span 2;
+    }
+
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding: 15px;
+      background: var(--bg-color);
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+    }
+
+    .calendar-title {
+      font-weight: bold;
+      font-size: 18px;
+      color: var(--primary-color);
+    }
+
+    .btn-nav {
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 8px 15px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .btn-nav:hover {
+      background: var(--primary-hover);
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .calendar-day {
+      background: var(--bg-color);
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      padding: 15px;
+      min-height: 200px;
+    }
+
+    .calendar-day.today {
+      border-color: var(--primary-color);
+      background: rgba(0, 123, 255, 0.05);
+    }
+
+    .day-header {
+      font-weight: bold;
+      color: var(--primary-color);
+      margin-bottom: 10px;
+      text-align: center;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .day-appointments {
+      margin-top: 10px;
+    }
+
+    .calendar-appointment {
+      background: var(--primary-color);
+      color: white;
+      padding: 5px 8px;
+      margin: 5px 0;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .calendar-appointment:hover {
+      background: var(--primary-hover);
+    }
+
+    .google-calendar-section {
+      background: var(--surface);
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      margin-top: 15px;
+    }
+
+    .google-calendar-section h3 {
+      margin: 0 0 10px 0;
+      color: var(--text-primary);
+    }
+
+    .btn-google {
+      background: #4285f4;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .btn-google:hover {
+      background: #3367d6;
+    }
+
+    .btn-google:disabled {
+      background: var(--success-color);
+      cursor: not-allowed;
+    }
+
+    .status-message {
+      margin-top: 10px;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .status-message.success {
+      background: rgba(40, 167, 69, 0.1);
+      color: var(--success-color);
+      border: 1px solid var(--success-color);
+    }
+
+    .status-message.error {
+      background: rgba(220, 53, 69, 0.1);
+      color: var(--danger-color);
+      border: 1px solid var(--danger-color);
+    }
+
+    .appointment-actions {
+      margin-top: 8px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-small {
+      padding: 4px 8px;
+      font-size: 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .btn-edit {
+      background: var(--warning-color);
+      color: white;
+    }
+
+    .btn-delete {
+      background: var(--danger-color);
+      color: white;
+    }
+
+    .btn-small:hover {
+      opacity: 0.8;
+    }
+
+    .ai-examples {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+
+    .ai-examples h4 {
+      margin: 0 0 10px 0;
+      color: white;
+    }
+
+    .example-commands {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .command-example {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 14px;
+    }
+
+    .command-example:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateX(5px);
+    }
+
+    .warning-color: #f59e0b;
       text-align: center;
       color: var(--text-color);
       opacity: 0.7;
@@ -229,15 +422,48 @@
 
   <!-- Main Dashboard Grid -->
   <div class="dashboard-grid">
-    <!-- Appointments Section -->
+    <!-- Calendar View Section -->
+    <div class="section calendar-section">
+      <h2>📅 3-Day Calendar View</h2>
+      
+      <div class="calendar-header">
+        <button onclick="previousDays()" class="btn-nav">‹ Previous</button>
+        <span id="calendar-dates" class="calendar-title">Loading...</span>
+        <button onclick="nextDays()" class="btn-nav">Next ›</button>
+      </div>
+      
+      <div class="calendar-grid" id="calendar-grid">
+        <!-- Calendar will be populated by JavaScript -->
+      </div>
+      
+      <!-- Google Calendar Integration -->
+      <div class="google-calendar-section">
+        <h3>🔗 Google Calendar Integration</h3>
+        <button onclick="connectGoogleCalendar()" class="btn btn-google" id="google-connect-btn">
+          📅 Connect Google Calendar
+        </button>
+        <div id="google-status" class="status-message"></div>
+      </div>
+    </div>
+
+    <!-- Appointments List Section -->
     <div class="section">
-      <h2>Live Appointments (from real users)</h2>
+      <h2>📋 Live Appointments</h2>
       
       {% if appointments %}
         {% for appt in appointments %}
-          <div class="appointment">
-            <strong>{{ appt.patient }}</strong> — {{ appt.time }} <br>
-            <em>Reason: {{ appt.reason }}</em>
+          <div class="appointment" data-id="{{ loop.index }}">
+            <div class="appointment-header">
+              <strong>{{ appt.patient }}</strong>
+              <span class="appointment-time">{{ appt.time }}</span>
+            </div>
+            <div class="appointment-reason">
+              <em>Reason: {{ appt.reason }}</em>
+            </div>
+            <div class="appointment-actions">
+              <button onclick="editAppointment('{{ loop.index }}', '{{ appt.patient }}', '{{ appt.time }}', '{{ appt.reason }}')" class="btn-small btn-edit">✏️ Edit</button>
+              <button onclick="deleteAppointment('{{ loop.index }}', '{{ appt.time }}')" class="btn-small btn-delete">🗑️ Delete</button>
+            </div>
           </div>
         {% endfor %}
       {% else %}
@@ -247,20 +473,39 @@
         </div>
       {% endif %}
     </div>
+  </div>
 
-    <!-- AI Agent Section -->
-    <div class="section">
-      <h2>AI Agent Input</h2>
-      
-      <textarea id="input" rows="3" cols="50" placeholder="Tell the AI agent to block time or reschedule..."></textarea>
-      
-      <div class="button-group">
-        <button onclick="speak()">🎤 Speak</button>
-        <button onclick="send()">Submit</button>
+  <!-- Enhanced AI Agent Section -->
+  <div class="section ai-section" style="margin-top: 20px;">
+    <h2>🤖 AI Assistant - Appointment Management</h2>
+    
+    <div class="ai-examples">
+      <h4>Try these commands:</h4>
+      <div class="example-commands">
+        <span onclick="fillCommand('Add appointment for John Doe on Monday 3pm for checkup')" class="command-example">➕ Add: "Add appointment for John Doe on Monday 3pm for checkup"</span>
+        <span onclick="fillCommand('Reschedule Friday 10am appointment to Friday 2pm')" class="command-example">📝 Modify: "Reschedule Friday 10am appointment to Friday 2pm"</span>
+        <span onclick="fillCommand('Cancel the Saturday 11am appointment')" class="command-example">❌ Delete: "Cancel the Saturday 11am appointment"</span>
+        <span onclick="fillCommand('Block Tuesday from 1pm to 3pm for lunch')" class="command-example">🚫 Block: "Block Tuesday from 1pm to 3pm for lunch"</span>
       </div>
+    </div>
+    
+    <div class="form-group">
+      <label for="input">AI Command Input</label>
+      <textarea 
+        id="input" 
+        rows="3" 
+        placeholder="Tell me to add, modify, or delete appointments. Example: 'Add appointment for Sarah on Wednesday 2pm for consultation' or 'Cancel the Friday 10am appointment'"
+      ></textarea>
+    </div>
 
-      <div class="response-box">
-        <p><strong>Response:</strong> <span id="response">AI responses will appear here...</span></p>
+    <div class="button-group">
+      <button onclick="speak()" class="btn btn-outline">🎤 Speak Command</button>
+      <button onclick="send()" class="btn btn-white">🚀 Execute Command</button>
+    </div>
+
+    <div class="response-section">
+      <div id="response" class="response-text">
+        AI responses will appear here...
       </div>
     </div>
   </div>
