@@ -84,7 +84,12 @@ def ask():
         time = "Tomorrow 10 AM"  # Default placeholder
         
         # Try to extract time from the message
-        if "saturday" in original_message.lower():
+        if "friday" in original_message.lower():
+            if "10" in original_message or "10am" in original_message.lower():
+                time = "Friday 10:00 AM"
+            else:
+                time = "Friday Morning"
+        elif "saturday" in original_message.lower():
             if "11" in original_message or "11am" in original_message.lower():
                 time = "Saturday 11:00 AM"
             else:
@@ -107,25 +112,43 @@ def ask():
         response_text = f"✅ Your appointment has been successfully booked for {time}. Dr. Lee will see you for: {reason}. Please arrive 15 minutes early."
         
     else:
-        # Regular appointment inquiry
+        # FOR ANY APPOINTMENT REQUEST - AUTOMATICALLY BOOK IT
         name = "New Patient"
         reason = user_input
         time = "Tomorrow 10 AM"  # Default placeholder
         
-        # Simple availability response
-        if any(word in user_input.lower() for word in ["appointment", "book", "schedule", "see doctor"]):
-            response_text = f"Dr. Lee is available for your concern: '{reason}'. Would you like to book this appointment?"
-        else:
-            # Add as inquiry (not confirmed)
+        # Extract time from user input
+        if "friday" in user_input.lower():
+            if "10" in user_input or "10am" in user_input.lower():
+                time = "Friday 10:00 AM"
+            else:
+                time = "Friday Morning"
+        elif "saturday" in user_input.lower():
+            if "11" in user_input or "11am" in user_input.lower():
+                time = "Saturday 11:00 AM"
+            else:
+                time = "Saturday Morning"
+        elif "tomorrow" in user_input.lower():
+            time = "Tomorrow 10:00 AM"
+        elif "today" in user_input.lower():
+            time = "Today (if available)"
+        
+        # Auto-book any appointment request
+        if any(word in user_input.lower() for word in ["appointment", "book", "schedule", "see doctor", "visit", "consultation"]):
+            # Add to appointments immediately
             appointments.append({
                 "patient": name,
                 "time": time,
                 "reason": reason,
                 "location": location,
                 "doctor_id": "drlee",
-                "status": "inquiry"
+                "status": "confirmed"
             })
-            response_text = f"Thank you for your inquiry about '{reason}'. Dr. Lee is available. Would you like to book an appointment?"
+            
+            response_text = f"✅ Your appointment has been booked for {time} with Dr. Lee. Reason: {reason}. You will receive a confirmation shortly."
+        else:
+            # Just health inquiry, don't book
+            response_text = f"Thank you for your health inquiry about '{reason}'. If you'd like to schedule an appointment, please mention 'appointment' or 'book' in your message."
 
     return jsonify({"response": response_text})
 
