@@ -214,73 +214,34 @@
   <!-- Keep using your existing script.js file -->
   <script src="/static/script.js"></script>
   
-  <!-- Add simple theme functionality -->
+  <!-- Add ONLY the new functionality without conflicts -->
   <script>
-    // Enhanced location management with city name display
-    let userLocation = "";
-    let lastUserMessage = ""; // Store the last message for booking
-
-    // Get location and display city name
-    if (navigator.geolocation) {
-      document.getElementById('location-text').textContent = "📍 Getting your location...";
-      
-      navigator.geolocation.getCurrentPosition(async (position) => {
-        userLocation = `Latitude: ${position.coords.latitude}, Longitude: ${position.coords.longitude}`;
-        console.log("Location obtained:", userLocation); // Debug
-        
-        // Try to get city name from coordinates
-        try {
-          document.getElementById('location-text').textContent = "📍 Getting location name...";
-          
-          const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=en`);
-          const data = await response.json();
-          const cityName = data.city || data.locality || data.principalSubdivision || "Unknown Location";
-          
-          document.getElementById('location-text').textContent = `📍 Location: ${cityName}`;
-          console.log("City name found:", cityName); // Debug
-          
-        } catch (error) {
-          console.error("Error getting city name:", error); // Debug
-          document.getElementById('location-text').textContent = `📍 Location detected (coordinates available)`;
-        }
-      }, (error) => {
-        console.error("Geolocation error:", error); // Debug
-        document.getElementById('location-text').textContent = `📍 Location access denied. Please enable it for better results.`;
-        alert("Location access denied. Please enable it for better results.");
-      });
-    } else {
-      document.getElementById('location-text').textContent = `📍 Geolocation is not supported by this browser.`;
-      alert("Geolocation is not supported by this browser.");
-    }
-
-    // Enhanced send function that shows booking buttons for appointment requests
-    async function send() {
+    // Store last message for booking (avoid conflicts)
+    let lastPatientMessage = "";
+    
+    // Override the existing send function to add booking button logic
+    const originalSend = window.send;
+    window.send = async function() {
       const message = document.getElementById("input").value;
-      lastUserMessage = message; // Store for booking confirmation
+      lastPatientMessage = message; // Store for booking confirmation
       
-      const res = await fetch("/api/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message,
-          location: userLocation
-        })
-      });
-      const data = await res.json();
-      document.getElementById("response").innerHTML = data.response;
+      // Call the original send function from script.js
+      await originalSend();
       
-      // Show booking buttons if response contains question about booking
-      const response = data.response.toLowerCase();
-      if (response.includes('would you like to book') || 
-          response.includes('book this appointment') ||
-          response.includes('available for your concern') ||
-          response.includes('book an appointment')) {
-        console.log("Showing booking buttons"); // Debug
-        document.getElementById('booking-buttons').style.display = 'block';
-      } else {
-        document.getElementById('booking-buttons').style.display = 'none';
-      }
-    }
+      // After response is loaded, check if we should show booking buttons
+      setTimeout(() => {
+        const responseText = document.getElementById("response").innerText.toLowerCase();
+        if (responseText.includes('would you like to book') || 
+            responseText.includes('book this appointment') ||
+            responseText.includes('available for your concern') ||
+            responseText.includes('book an appointment')) {
+          console.log("Showing booking buttons"); // Debug
+          document.getElementById('booking-buttons').style.display = 'block';
+        } else {
+          document.getElementById('booking-buttons').style.display = 'none';
+        }
+      }, 100);
+    };
 
     // Confirm booking function
     async function confirmBooking() {
@@ -288,12 +249,18 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: `CONFIRM_BOOKING: ${lastUserMessage}`,
-          location: userLocation
+          message: `CONFIRM_BOOKING: ${lastPatientMessage}`,
+          location: userLocation || ""
         })
       });
       const confirmData = await confirmRes.json();
-      document.getElementById("response").innerHTML = `✅ <strong>Booking Confirmed!</strong><br>${confirmData.response}`;
+      document.getElementById("response").innerText = `✅ Booking Confirmed! ${confirmData.response}`;
+      document.getElementById('booking-buttons').style.display = 'none';
+    }
+
+    // Cancel booking function
+    function cancelBooking() {
+      document.getElementById("response").innerText = `❌ Booking Cancelled. Feel free to ask about other available times.`;
       document.getElementById('booking-buttons').style.display = 'none';
     }
 
@@ -301,13 +268,39 @@
     function testButtons() {
       console.log("Testing booking buttons");
       document.getElementById('booking-buttons').style.display = 'block';
-      document.getElementById("response").innerHTML = "🧪 <strong>Test Mode:</strong> Dr. Lee is available for your concern. Would you like to book this appointment?";
+      document.getElementById("response").innerText = "🧪 Test Mode: Dr. Lee is available for your concern. Would you like to book this appointment?";
     }
 
-    // Cancel booking function
-    function cancelBooking() {
-      document.getElementById("response").innerHTML = `❌ <strong>Booking Cancelled.</strong><br>Feel free to ask about other available times.`;
-      document.getElementById('booking-buttons').style.display = 'none';
+    // Enhanced location display (without conflicting with script.js)
+    function updateLocationDisplay() {
+      if (navigator.geolocation) {
+        document.getElementById('location-text').textContent = "📍 Getting your location...";
+        
+        navigator.geolocation.getCurrentPosition(async (position) => {
+          console.log("Location obtained"); // Debug
+          
+          // Try to get city name from coordinates
+          try {
+            document.getElementById('location-text').textContent = "📍 Getting location name...";
+            
+            const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=en`);
+            const data = await response.json();
+            const cityName = data.city || data.locality || data.principalSubdivision || "Unknown Location";
+            
+            document.getElementById('location-text').textContent = `📍 Location: ${cityName}`;
+            console.log("City name found:", cityName); // Debug
+            
+          } catch (error) {
+            console.error("Error getting city name:", error); // Debug
+            document.getElementById('location-text').textContent = `📍 Location detected (coordinates available)`;
+          }
+        }, (error) => {
+          console.error("Geolocation error:", error); // Debug
+          document.getElementById('location-text').textContent = `📍 Location access denied. Please enable it for better results.`;
+        });
+      } else {
+        document.getElementById('location-text').textContent = `📍 Geolocation is not supported by this browser.`;
+      }
     }
 
     // Simple theme toggle functionality
@@ -322,12 +315,15 @@
       button.textContent = newTheme === 'dark' ? '☀️' : '🌙';
     }
 
-    // Load saved theme on page load
+    // Load saved theme and initialize location on page load
     document.addEventListener('DOMContentLoaded', function() {
       const savedTheme = localStorage.getItem('theme') || 'light';
       document.documentElement.setAttribute('data-theme', savedTheme);
       const button = document.querySelector('.theme-toggle');
       button.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+      
+      // Initialize location display
+      updateLocationDisplay();
     });
   </script>
 </body>
