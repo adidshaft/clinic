@@ -99,20 +99,26 @@ def ask():
         elif "today" in original_message.lower():
             time = "Today (if available)"
 
-        # Add to appointments
-        appointments.append({
-            "patient": name,
-            "time": time,
-            "reason": reason,
-            "location": location,
-            "doctor_id": "drlee",  # Default doctor
-            "status": "confirmed"
-        })
+        # Check if this time slot is already taken
+        existing_appointment = next((apt for apt in appointments if apt.get("time") == time and apt.get("doctor_id") == "drlee"), None)
         
-        response_text = f"✅ Your appointment has been successfully booked for {time}. Dr. Lee will see you for: {reason}. Please arrive 15 minutes early."
+        if existing_appointment:
+            response_text = f"❌ Sorry, the {time} slot is already booked. Please choose a different time."
+        else:
+            # Add to appointments
+            appointments.append({
+                "patient": name,
+                "time": time,
+                "reason": reason,
+                "location": location,
+                "doctor_id": "drlee",  # Default doctor
+                "status": "confirmed"
+            })
+            
+            response_text = f"✅ Your appointment has been successfully booked for {time}. Dr. Lee will see you for: {reason}. Please arrive 15 minutes early."
         
     else:
-        # FOR ANY APPOINTMENT REQUEST - AUTOMATICALLY BOOK IT
+        # Handle appointment requests with availability check
         name = "New Patient"
         reason = user_input
         time = "Tomorrow 10 AM"  # Default placeholder
@@ -128,26 +134,33 @@ def ask():
                 time = "Saturday 11:00 AM"
             else:
                 time = "Saturday Morning"
+        elif "sunday" in user_input.lower():
+            if "9" in user_input or "9am" in user_input.lower():
+                time = "Sunday 9:00 AM"
+            else:
+                time = "Sunday Morning"
+        elif "monday" in user_input.lower():
+            if "2" in user_input or "2pm" in user_input.lower():
+                time = "Monday 2:00 PM"
+            else:
+                time = "Monday Afternoon"
         elif "tomorrow" in user_input.lower():
             time = "Tomorrow 10:00 AM"
         elif "today" in user_input.lower():
             time = "Today (if available)"
         
-        # Auto-book any appointment request
+        # Check for appointment request keywords
         if any(word in user_input.lower() for word in ["appointment", "book", "schedule", "see doctor", "visit", "consultation"]):
-            # Add to appointments immediately
-            appointments.append({
-                "patient": name,
-                "time": time,
-                "reason": reason,
-                "location": location,
-                "doctor_id": "drlee",
-                "status": "confirmed"
-            })
+            # Check if this time slot is already taken
+            existing_appointment = next((apt for apt in appointments if apt.get("time") == time and apt.get("doctor_id") == "drlee"), None)
             
-            response_text = f"✅ Your appointment has been booked for {time} with Dr. Lee. Reason: {reason}. You will receive a confirmation shortly."
+            if existing_appointment:
+                response_text = f"❌ Sorry, Dr. Lee is not available at {time}. That slot is already booked. Please try a different time."
+            else:
+                # Show availability and ask for confirmation
+                response_text = f"✅ Great! Dr. Lee is available at {time} for your concern: '{reason}'. Would you like to book this appointment?"
         else:
-            # Just health inquiry, don't book
+            # Just health inquiry, don't check availability
             response_text = f"Thank you for your health inquiry about '{reason}'. If you'd like to schedule an appointment, please mention 'appointment' or 'book' in your message."
 
     return jsonify({"response": response_text})

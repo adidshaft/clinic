@@ -214,8 +214,30 @@
   <!-- Keep using your existing script.js file -->
   <script src="/static/script.js"></script>
   
-  <!-- Add ONLY the new functionality without conflicts -->
+  <!-- Enhanced functionality -->
   <script>
+    // Override the send function to add booking button detection
+    const originalSend = window.send;
+    window.send = async function() {
+      // Call original send function first
+      await originalSend();
+      
+      // After response is received, check if we should show booking buttons
+      setTimeout(() => {
+        const responseElement = document.getElementById("response");
+        const responseText = responseElement.innerText.toLowerCase();
+        
+        // Show booking buttons if slot is available and asks for confirmation
+        if (responseText.includes('would you like to book') && 
+            responseText.includes('available')) {
+          console.log("Slot available - showing booking buttons");
+          document.getElementById('booking-buttons').style.display = 'block';
+        } else {
+          document.getElementById('booking-buttons').style.display = 'none';
+        }
+      }, 200);
+    };
+
     // Simple booking confirmation function
     async function confirmBooking() {
       const message = document.getElementById("input").value;
@@ -229,7 +251,7 @@
         })
       });
       const confirmData = await confirmRes.json();
-      document.getElementById("response").innerText = `✅ Booking Confirmed! ${confirmData.response}`;
+      document.getElementById("response").innerText = confirmData.response;
       document.getElementById('booking-buttons').style.display = 'none';
     }
 
@@ -260,7 +282,7 @@
         locationElement.textContent = "📍 Getting your location...";
         
         navigator.geolocation.getCurrentPosition(async (position) => {
-          console.log("Location obtained"); // Debug
+          console.log("Location obtained");
           
           try {
             locationElement.textContent = "📍 Getting location name...";
