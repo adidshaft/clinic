@@ -115,6 +115,87 @@
       opacity: 0.8;
     }
 
+    .appointment-source {
+      font-size: 12px;
+      color: var(--text-color);
+      opacity: 0.6;
+      margin-top: 5px;
+    }
+
+    .google-calendar-badge {
+      background: #4285f4;
+      color: white;
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-size: 10px;
+      margin-left: 10px;
+    }
+
+    .google-calendar-section {
+      background: var(--card-bg);
+      padding: 20px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      margin-bottom: 20px;
+    }
+
+    .google-calendar-section h3 {
+      color: var(--primary-color);
+      margin: 0 0 15px 0;
+    }
+
+    .calendar-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .status-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--danger-color);
+    }
+
+    .status-indicator.connected {
+      background: var(--success-color);
+    }
+
+    .btn-google {
+      background: #4285f4;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-right: 10px;
+    }
+
+    .btn-google:hover {
+      background: #3367d6;
+    }
+
+    .btn-google:disabled {
+      background: var(--success-color);
+      cursor: not-allowed;
+    }
+
+    .btn-sync {
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .btn-sync:hover {
+      background: var(--primary-hover);
+    }
+
     textarea {
       width: 100%;
       padding: 15px;
@@ -219,6 +300,31 @@
       transform: translateX(5px);
     }
 
+    .status-message {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    .status-message.success {
+      background: rgba(40, 167, 69, 0.1);
+      color: var(--success-color);
+      border: 1px solid var(--success-color);
+    }
+
+    .status-message.error {
+      background: rgba(220, 53, 69, 0.1);
+      color: var(--danger-color);
+      border: 1px solid var(--danger-color);
+    }
+
+    .status-message.info {
+      background: rgba(0, 123, 255, 0.1);
+      color: var(--primary-color);
+      border: 1px solid var(--primary-color);
+    }
+
     /* Mobile Responsive */
     @media (max-width: 768px) {
       body {
@@ -243,6 +349,12 @@
         width: 100%;
         margin-bottom: 10px;
       }
+
+      .calendar-status {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+      }
     }
   </style>
 </head>
@@ -260,6 +372,39 @@
 
   <h1>Doctor's Dashboard</h1>
 
+  <!-- Google Calendar Integration Section -->
+  <div class="google-calendar-section">
+    <h3>📅 Google Calendar Integration</h3>
+    
+    <div class="calendar-status">
+      <div class="status-indicator {% if google_connected %}connected{% endif %}"></div>
+      <span id="connection-status">
+        {% if google_connected %}
+          ✅ Connected to Google Calendar
+        {% else %}
+          ❌ Not connected to Google Calendar
+        {% endif %}
+      </span>
+    </div>
+
+    <div>
+      {% if not google_connected %}
+        <button onclick="connectGoogleCalendar()" class="btn-google" id="google-connect-btn">
+          📅 Connect Google Calendar
+        </button>
+      {% else %}
+        <button onclick="syncGoogleCalendar()" class="btn-sync" id="sync-btn">
+          🔄 Sync Calendar
+        </button>
+        <button onclick="disconnectGoogleCalendar()" class="btn-google" style="background: var(--danger-color);">
+          🔌 Disconnect
+        </button>
+      {% endif %}
+    </div>
+
+    <div id="google-status" class="status-message" style="display: none;"></div>
+  </div>
+
   <!-- Main Dashboard Grid -->
   <div class="dashboard-grid">
     <!-- Appointments Section -->
@@ -269,14 +414,21 @@
       {% if appointments %}
         {% for appt in appointments %}
           <div class="appointment">
-            <strong>{{ appt.patient }}</strong> — {{ appt.time }} <br>
+            <strong>{{ appt.patient }}</strong> — {{ appt.time }}
+            {% if appt.location == 'Google Calendar' %}
+              <span class="google-calendar-badge">📅 Google</span>
+            {% endif %}
+            <br>
             <em>Reason: {{ appt.reason }}</em>
+            {% if appt.location %}
+              <div class="appointment-source">Source: {{ appt.location }}</div>
+            {% endif %}
           </div>
         {% endfor %}
       {% else %}
         <div class="empty-state">
           <p>📅 No appointments scheduled yet.</p>
-          <small>Patient appointments will appear here automatically.</small>
+          <small>Connect Google Calendar to sync existing appointments, or patients can book through the patient portal.</small>
         </div>
       {% endif %}
     </div>
@@ -294,7 +446,7 @@
         <span class="command-example" onclick="fillCommand('Block tomorrow from 2pm to 4pm')">🚫 Block tomorrow from 2pm to 4pm</span>
       </div>
       
-      <textarea id="input" rows="3" placeholder="Tell the AI to add, modify, or cancel appointments. Try: 'Add appointment for Sarah on Wednesday 2pm for consultation'"></textarea>
+      <textarea id="input" rows="3" placeholder="Tell the AI to add, modify, or cancel appointments. All changes will sync to Google Calendar automatically if connected."></textarea>
       
       <div class="button-group">
         <button onclick="speak()">🎤 Speak</button>
@@ -313,7 +465,89 @@
       document.getElementById('input').value = command;
     }
 
-    // PRESERVE EXISTING FUNCTIONALITY - Voice Recognition (from original clinic.html)
+    // Google Calendar Integration Functions
+    async function connectGoogleCalendar() {
+      const button = document.getElementById('google-connect-btn');
+      const status = document.getElementById('google-status');
+      
+      button.disabled = true;
+      button.textContent = '🔄 Connecting...';
+      status.style.display = 'block';
+      status.className = 'status-message info';
+      status.textContent = 'Initiating Google Calendar connection...';
+      
+      try {
+        const response = await fetch('/api/google-calendar-connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          if (data.redirect) {
+            status.textContent = 'Redirecting to Google for authentication...';
+            setTimeout(() => {
+              window.location.href = data.redirect_url;
+            }, 1000);
+          } else {
+            status.className = 'status-message success';
+            status.textContent = data.message;
+            setTimeout(() => location.reload(), 2000);
+          }
+        } else {
+          throw new Error(data.error || 'Connection failed');
+        }
+      } catch (error) {
+        button.disabled = false;
+        button.textContent = '📅 Connect Google Calendar';
+        status.className = 'status-message error';
+        status.textContent = `Connection failed: ${error.message}`;
+      }
+    }
+
+    async function syncGoogleCalendar() {
+      const button = document.getElementById('sync-btn');
+      const status = document.getElementById('google-status');
+      
+      button.disabled = true;
+      button.textContent = '🔄 Syncing...';
+      status.style.display = 'block';
+      status.className = 'status-message info';
+      status.textContent = 'Syncing with Google Calendar...';
+      
+      try {
+        const response = await fetch('/api/google-calendar-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          status.className = 'status-message success';
+          status.textContent = data.message;
+          setTimeout(() => location.reload(), 2000);
+        } else {
+          throw new Error(data.error);
+        }
+      } catch (error) {
+        status.className = 'status-message error';
+        status.textContent = `Sync failed: ${error.message}`;
+      } finally {
+        button.disabled = false;
+        button.textContent = '🔄 Sync Calendar';
+      }
+    }
+
+    function disconnectGoogleCalendar() {
+      if (confirm('Are you sure you want to disconnect Google Calendar? This will stop syncing appointments.')) {
+        // Implement disconnect functionality
+        alert('Disconnect functionality will be implemented. For now, you can revoke access in your Google account settings.');
+      }
+    }
+
+    // PRESERVE EXISTING FUNCTIONALITY - Voice Recognition
     function speak() {
       if (!('webkitSpeechRecognition' in window)) {
         alert('Speech recognition not supported in this browser. Try Chrome or Edge.');
@@ -331,7 +565,7 @@
       recognition.start();
     }
 
-    // PRESERVE EXISTING FUNCTIONALITY - Send function (from original clinic.html)
+    // PRESERVE EXISTING FUNCTIONALITY - Send function
     async function send() {
       const message = document.getElementById("input").value;
       
@@ -382,6 +616,17 @@
       document.documentElement.setAttribute('data-theme', savedTheme);
       const button = document.querySelector('.theme-toggle');
       button.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+
+      // Check URL for connection success
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('connected') === 'true') {
+        const status = document.getElementById('google-status');
+        if (status) {
+          status.style.display = 'block';
+          status.className = 'status-message success';
+          status.textContent = '✅ Google Calendar connected successfully! Appointments synced.';
+        }
+      }
     });
   </script>
 </body>

@@ -1,8 +1,17 @@
-from flask import Flask, request, jsonify, render_template, redirect, url_for
+from flask import Flask, request, jsonify, render_template, redirect, url_for, session
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from openai import OpenAI
 import os
 import re
+from datetime import datetime, timedelta
+import json
+
+# Google Calendar imports
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import Flow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 # Load environment variable (optional: only needed locally)
 from dotenv import load_dotenv
@@ -15,6 +24,10 @@ app.secret_key = "your-secret-key"
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
+
+# Google Calendar configuration
+SCOPES = ['https://www.googleapis.com/auth/calendar']
+CLIENT_SECRETS_FILE = 'client_secret.json'
 
 # Temporary doctor store
 doctors = {
@@ -54,7 +67,7 @@ def logout():
 def internal_error(e):
     return f"Something broke: {str(e)}", 500
 
-# In-memory storage for appointments
+# In-memory storage for appointments (now synced with Google Calendar)
 appointments = []
 
 # Initialize OpenAI client (for SDK v1.x)
@@ -63,6 +76,220 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 @app.route('/')
 def index():
     return render_template('index.html')
+
+# Google Calendar Helper Functions
+def get_google_calendar_service():
+    """Get Google Calendar service object"""
+    creds = None
+    doctor_id = current_user.get_id()
+    token_file = f'token_{doctor_id}.json'
+    
+    # Load existing credentials
+    if os.path.exists(token_file):
+        creds = Credentials.from_authorized_user_file(token_file, SCOPES)
+    
+    # If credentials are not valid, return None
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            try:
+                creds.refresh(Request())
+                # Save the refreshed credentials
+                with open(token_file, 'w') as token:
+                    token.write(creds.to_json())
+            except:
+                return None
+        else:
+            return None
+    
+    try:
+        service = build('calendar', 'v3', credentials=creds)
+        return service
+    except Exception as e:
+        print(f"Error building service: {e}")
+        return None
+
+def sync_from_google_calendar():
+    """Fetch appointments from Google Calendar and sync to local storage"""
+    service = get_google_calendar_service()
+    if not service:
+        return False
+    
+    try:
+        # Get events from the next 30 days
+        now = datetime.utcnow().isoformat() + 'Z'
+        future = (datetime.utcnow() + timedelta(days=30)).isoformat() + 'Z'
+        
+        events_result = service.events().list(
+            calendarId='primary',
+            timeMin=now,
+            timeMax=future,
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+        
+        events = events_result.get('items', [])
+        
+        # Clear existing appointments for this doctor
+        global appointments
+        doctor_id = current_user.get_id()
+        appointments = [apt for apt in appointments if apt.get("doctor_id") != doctor_id]
+        
+        # Add Google Calendar events to appointments
+        for event in events:
+            if 'summary' in event and 'start' in event:
+                start = event['start'].get('dateTime', event['start'].get('date'))
+                
+                # Parse the datetime
+                if 'T' in start:
+                    event_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                    formatted_time = event_time.strftime('%A %I:%M %p')
+                else:
+                    # All day event
+                    formatted_time = "All Day"
+                
+                # Extract patient name and reason from event summary
+                summary = event.get('summary', 'Appointment')
+                description = event.get('description', '')
+                
+                # Try to parse "Patient: Name - Reason: Description" format
+                if ' - ' in summary:
+                    parts = summary.split(' - ')
+                    patient_name = parts[0].replace('Patient: ', '').strip()
+                    reason = parts[1].replace('Reason: ', '').strip() if len(parts) > 1 else 'Appointment'
+                else:
+                    patient_name = summary
+                    reason = description or 'Appointment'
+                
+                appointments.append({
+                    "patient": patient_name,
+                    "time": formatted_time,
+                    "reason": reason,
+                    "location": "Google Calendar",
+                    "doctor_id": doctor_id,
+                    "status": "confirmed",
+                    "google_event_id": event.get('id')
+                })
+        
+        return True
+    except Exception as e:
+        print(f"Error syncing from Google Calendar: {e}")
+        return False
+
+def create_google_calendar_event(patient, time, reason):
+    """Create an event in Google Calendar"""
+    service = get_google_calendar_service()
+    if not service:
+        return None
+    
+    try:
+        # Parse the time - this is a simplified version
+        # You might want to improve this parsing based on your time format
+        event_start = datetime.now() + timedelta(days=1)  # Default to tomorrow
+        
+        # Try to parse common time formats
+        if 'monday' in time.lower():
+            # Find next Monday
+            days_ahead = 0 - datetime.now().weekday()
+            if days_ahead <= 0:
+                days_ahead += 7
+            event_start = datetime.now() + timedelta(days=days_ahead)
+        elif 'friday' in time.lower():
+            days_ahead = 4 - datetime.now().weekday()
+            if days_ahead <= 0:
+                days_ahead += 7
+            event_start = datetime.now() + timedelta(days=days_ahead)
+        # Add more day parsing as needed
+        
+        # Set time (simplified - defaults to 10 AM)
+        if '3pm' in time.lower():
+            event_start = event_start.replace(hour=15, minute=0)
+        elif '2pm' in time.lower():
+            event_start = event_start.replace(hour=14, minute=0)
+        elif '10am' in time.lower():
+            event_start = event_start.replace(hour=10, minute=0)
+        else:
+            event_start = event_start.replace(hour=10, minute=0)  # Default 10 AM
+        
+        event_end = event_start + timedelta(hours=1)  # 1 hour appointment
+        
+        event = {
+            'summary': f'Patient: {patient} - Reason: {reason}',
+            'description': f'Appointment for {patient}\nReason: {reason}',
+            'start': {
+                'dateTime': event_start.isoformat(),
+                'timeZone': 'America/New_York',  # Adjust timezone as needed
+            },
+            'end': {
+                'dateTime': event_end.isoformat(),
+                'timeZone': 'America/New_York',
+            },
+        }
+        
+        created_event = service.events().insert(calendarId='primary', body=event).execute()
+        return created_event.get('id')
+    
+    except Exception as e:
+        print(f"Error creating Google Calendar event: {e}")
+        return None
+
+def delete_google_calendar_event(event_id):
+    """Delete an event from Google Calendar"""
+    service = get_google_calendar_service()
+    if not service or not event_id:
+        return False
+    
+    try:
+        service.events().delete(calendarId='primary', eventId=event_id).execute()
+        return True
+    except Exception as e:
+        print(f"Error deleting Google Calendar event: {e}")
+        return False
+
+# Google Calendar OAuth routes
+@app.route('/google-calendar-auth')
+@login_required
+def google_calendar_auth():
+    """Start Google Calendar OAuth flow"""
+    flow = Flow.from_client_secrets_file(
+        CLIENT_SECRETS_FILE,
+        scopes=SCOPES,
+        redirect_uri=url_for('google_calendar_callback', _external=True)
+    )
+    
+    authorization_url, state = flow.authorization_url(
+        access_type='offline',
+        include_granted_scopes='true'
+    )
+    
+    session['state'] = state
+    return redirect(authorization_url)
+
+@app.route('/google-calendar-callback')
+@login_required
+def google_calendar_callback():
+    """Handle Google Calendar OAuth callback"""
+    state = session.get('state')
+    
+    flow = Flow.from_client_secrets_file(
+        CLIENT_SECRETS_FILE,
+        scopes=SCOPES,
+        state=state,
+        redirect_uri=url_for('google_calendar_callback', _external=True)
+    )
+    
+    flow.fetch_token(authorization_response=request.url)
+    
+    # Save credentials
+    doctor_id = current_user.get_id()
+    token_file = f'token_{doctor_id}.json'
+    
+    with open(token_file, 'w') as token:
+        token.write(flow.credentials.to_json())
+    
+    # Sync calendar after successful authentication
+    sync_from_google_calendar()
+    
+    return redirect(url_for('clinic_dashboard', connected=True))
 
 # Helper function to parse appointment commands
 def parse_appointment_command(command):
@@ -163,7 +390,7 @@ def ask():
         elif "today" in original_message.lower():
             time = "Today (if available)"
 
-        # Check if this time slot is already taken
+        # Check if this time slot is already taken (including Google Calendar)
         existing_appointment = next((apt for apt in appointments if apt.get("time") == time and apt.get("doctor_id") == "drlee"), None)
         
         if existing_appointment:
@@ -179,6 +406,11 @@ def ask():
                 "status": "confirmed"
             }
             appointments.append(new_appointment)
+            
+            # Try to create Google Calendar event
+            google_event_id = create_google_calendar_event(name, time, reason)
+            if google_event_id:
+                new_appointment["google_event_id"] = google_event_id
             
             response_text = f"✅ Your appointment has been successfully booked for {time}. Dr. Lee will see you for: {reason}. Please arrive 15 minutes early."
         
@@ -216,7 +448,7 @@ def ask():
         
         # Check for appointment request keywords
         if any(word in user_input.lower() for word in ["appointment", "book", "schedule", "see doctor", "visit", "consultation"]):
-            # Check if this time slot is already taken
+            # Check if this time slot is already taken (including Google Calendar)
             existing_appointment = next((apt for apt in appointments if apt.get("time") == time and apt.get("doctor_id") == "drlee"), None)
             
             if existing_appointment:
@@ -233,9 +465,17 @@ def ask():
 @app.route('/clinic')
 @login_required
 def clinic_dashboard():
+    # Sync with Google Calendar when loading dashboard
+    sync_from_google_calendar()
+    
     doc_id = current_user.get_id()
     filtered = [a for a in appointments if a.get("doctor_id") == doc_id]
-    return render_template("clinic.html", appointments=filtered)
+    
+    # Check if Google Calendar is connected
+    token_file = f'token_{doc_id}.json'
+    google_connected = os.path.exists(token_file)
+    
+    return render_template("clinic.html", appointments=filtered, google_connected=google_connected)
 
 @app.route('/api/clinic-ai', methods=['POST'])
 def clinic_ai():
@@ -254,7 +494,7 @@ def clinic_ai():
             time = parsed_command['time']
             reason = parsed_command['reason']
             
-            # Check if time slot is available
+            # Check if time slot is available (including Google Calendar)
             existing = next((apt for apt in appointments if apt.get("time") == time and apt.get("doctor_id") == current_user.get_id()), None)
             if existing:
                 return jsonify({"response": f"❌ Cannot add appointment. {time} slot is already booked by {existing['patient']}."})
@@ -270,7 +510,12 @@ def clinic_ai():
             }
             appointments.append(new_appointment)
             
-            return jsonify({"response": f"✅ Appointment added successfully! {patient} scheduled for {time} - {reason}."})
+            # Create Google Calendar event
+            google_event_id = create_google_calendar_event(patient, time, reason)
+            if google_event_id:
+                new_appointment["google_event_id"] = google_event_id
+            
+            return jsonify({"response": f"✅ Appointment added successfully! {patient} scheduled for {time} - {reason}. Also added to Google Calendar."})
         
         elif action == 'modify':
             # Modify existing appointment
@@ -287,10 +532,19 @@ def clinic_ai():
             if conflict:
                 return jsonify({"response": f"❌ Cannot reschedule. {new_time} slot is already booked by {conflict['patient']}."})
             
+            # Delete old Google Calendar event if exists
+            if existing.get('google_event_id'):
+                delete_google_calendar_event(existing['google_event_id'])
+            
             # Update appointment
             existing['time'] = new_time
             
-            return jsonify({"response": f"✅ Appointment rescheduled! {existing['patient']} moved from {old_time} to {new_time}."})
+            # Create new Google Calendar event
+            google_event_id = create_google_calendar_event(existing['patient'], new_time, existing['reason'])
+            if google_event_id:
+                existing["google_event_id"] = google_event_id
+            
+            return jsonify({"response": f"✅ Appointment rescheduled! {existing['patient']} moved from {old_time} to {new_time}. Google Calendar updated."})
         
         elif action == 'delete':
             # Delete appointment
@@ -301,9 +555,13 @@ def clinic_ai():
             if not existing:
                 return jsonify({"response": f"❌ No appointment found at {time}."})
             
+            # Delete Google Calendar event if exists
+            if existing.get('google_event_id'):
+                delete_google_calendar_event(existing['google_event_id'])
+            
             appointments.remove(existing)
             
-            return jsonify({"response": f"✅ Appointment deleted! {existing['patient']}'s {time} appointment has been cancelled."})
+            return jsonify({"response": f"✅ Appointment deleted! {existing['patient']}'s {time} appointment has been cancelled. Removed from Google Calendar."})
     
     # Handle other commands (block time, etc.)
     elif "block" in msg and ("tomorrow" in msg or "today" in msg or any(day in msg for day in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"])):
@@ -315,6 +573,65 @@ def clinic_ai():
     
     # Fallback response with examples
     return jsonify({"response": f"🤖 I can help you manage appointments! Try commands like:\n• 'Add appointment for John Doe on Monday 3pm for checkup'\n• 'Reschedule Friday 10am appointment to Friday 2pm'\n• 'Cancel the Saturday 11am appointment'\n\nYour command: '{msg}' - Please be more specific."})
+
+@app.route('/api/google-calendar-connect', methods=['POST'])
+def google_calendar_connect():
+    """Handle Google Calendar connection request"""
+    try:
+        # Check if already connected
+        doctor_id = current_user.get_id()
+        token_file = f'token_{doctor_id}.json'
+        
+        if os.path.exists(token_file):
+            # Try to use existing credentials
+            service = get_google_calendar_service()
+            if service:
+                # Sync calendar
+                sync_success = sync_from_google_calendar()
+                if sync_success:
+                    return jsonify({
+                        "success": True,
+                        "message": "Already connected to Google Calendar! Synced successfully.",
+                        "redirect": False
+                    })
+        
+        # Need to authenticate
+        return jsonify({
+            "success": True,
+            "message": "Redirecting to Google for authentication...",
+            "redirect": True,
+            "redirect_url": url_for('google_calendar_auth')
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        })
+
+@app.route('/api/google-calendar-sync', methods=['POST'])
+@login_required
+def google_calendar_sync():
+    """Manually sync with Google Calendar"""
+    try:
+        success = sync_from_google_calendar()
+        if success:
+            doc_id = current_user.get_id()
+            synced_count = len([a for a in appointments if a.get("doctor_id") == doc_id])
+            return jsonify({
+                "success": True,
+                "message": f"Synced {synced_count} appointments from Google Calendar."
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Failed to sync with Google Calendar. Please reconnect."
+            })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        })
 
 if __name__ == '__main__':
     app.run(debug=True)
