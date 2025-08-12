@@ -5,6 +5,7 @@ import os
 import re
 from datetime import datetime, timedelta
 import json
+import warnings
 
 # Google Calendar imports
 from google.auth.transport.requests import Request
@@ -25,9 +26,20 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
 
-# Google Calendar configuration
-SCOPES = ['https://www.googleapis.com/auth/calendar']
+# Google Calendar configuration - Updated scopes
+SCOPES = [
+    'https://www.googleapis.com/auth/calendar',
+    'https://www.googleapis.com/auth/calendar.readonly'
+]
 CLIENT_SECRETS_FILE = 'client_secret.json'
+
+# OAuth Configuration - handles both local and production
+if os.getenv('FLASK_ENV') == 'production' or 'onrender.com' in os.getenv('RENDER_EXTERNAL_URL', ''):
+    # Production URLs
+    OAUTH_REDIRECT_URI = 'https://clinic-vnpy.onrender.com/google-calendar-callback'
+else:
+    # Local development URLs
+    OAUTH_REDIRECT_URI = 'http://localhost:5000/google-calendar-callback'
 
 # Temporary doctor store
 doctors = {
@@ -80,44 +92,67 @@ def index():
 # Google Calendar Helper Functions
 def get_google_calendar_service():
     """Get Google Calendar service object"""
-    creds = None
-    doctor_id = current_user.get_id()
-    token_file = f'token_{doctor_id}.json'
-    
-    # Load existing credentials
-    if os.path.exists(token_file):
-        creds = Credentials.from_authorized_user_file(token_file, SCOPES)
-    
-    # If credentials are not valid, return None
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
+    try:
+        creds = None
+        doctor_id = current_user.get_id()
+        token_file = f'token_{doctor_id}.json'
+        
+        print(f"Looking for token file: {token_file}")
+        
+        # Load existing credentials
+        if os.path.exists(token_file):
             try:
-                creds.refresh(Request())
-                # Save the refreshed credentials
-                with open(token_file, 'w') as token:
-                    token.write(creds.to_json())
-            except:
+                creds = Credentials.from_authorized_user_file(token_file, SCOPES)
+                print("Credentials loaded from file")
+            except Exception as load_error:
+                print(f"Error loading credentials: {load_error}")
                 return None
         else:
+            print("No token file found")
             return None
-    
-    try:
-        service = build('calendar', 'v3', credentials=creds)
-        return service
+        
+        # If credentials are not valid, try to refresh
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                try:
+                    print("Refreshing expired credentials")
+                    creds.refresh(Request())
+                    # Save the refreshed credentials
+                    with open(token_file, 'w') as token:
+                        token.write(creds.to_json())
+                    print("Credentials refreshed and saved")
+                except Exception as refresh_error:
+                    print(f"Error refreshing credentials: {refresh_error}")
+                    return None
+            else:
+                print("Credentials are invalid and cannot be refreshed")
+                return None
+        
+        try:
+            service = build('calendar', 'v3', credentials=creds)
+            print("Google Calendar service built successfully")
+            return service
+        except Exception as build_error:
+            print(f"Error building service: {build_error}")
+            return None
+            
     except Exception as e:
-        print(f"Error building service: {e}")
+        print(f"Error in get_google_calendar_service: {e}")
         return None
 
 def sync_from_google_calendar():
     """Fetch appointments from Google Calendar and sync to local storage"""
     service = get_google_calendar_service()
     if not service:
+        print("No Google Calendar service available")
         return False
     
     try:
         # Get events from the next 30 days
         now = datetime.utcnow().isoformat() + 'Z'
         future = (datetime.utcnow() + timedelta(days=30)).isoformat() + 'Z'
+        
+        print(f"Fetching events from {now} to {future}")
         
         events_result = service.events().list(
             calendarId='primary',
@@ -128,51 +163,63 @@ def sync_from_google_calendar():
         ).execute()
         
         events = events_result.get('items', [])
+        print(f"Found {len(events)} events in Google Calendar")
         
         # Clear existing appointments for this doctor
         global appointments
         doctor_id = current_user.get_id()
+        old_count = len([apt for apt in appointments if apt.get("doctor_id") == doctor_id])
         appointments = [apt for apt in appointments if apt.get("doctor_id") != doctor_id]
         
         # Add Google Calendar events to appointments
+        synced_count = 0
         for event in events:
-            if 'summary' in event and 'start' in event:
-                start = event['start'].get('dateTime', event['start'].get('date'))
-                
-                # Parse the datetime
-                if 'T' in start:
-                    event_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
-                    formatted_time = event_time.strftime('%A %I:%M %p')
-                else:
-                    # All day event
-                    formatted_time = "All Day"
-                
-                # Extract patient name and reason from event summary
-                summary = event.get('summary', 'Appointment')
-                description = event.get('description', '')
-                
-                # Try to parse "Patient: Name - Reason: Description" format
-                if ' - ' in summary:
-                    parts = summary.split(' - ')
-                    patient_name = parts[0].replace('Patient: ', '').strip()
-                    reason = parts[1].replace('Reason: ', '').strip() if len(parts) > 1 else 'Appointment'
-                else:
-                    patient_name = summary
-                    reason = description or 'Appointment'
-                
-                appointments.append({
-                    "patient": patient_name,
-                    "time": formatted_time,
-                    "reason": reason,
-                    "location": "Google Calendar",
-                    "doctor_id": doctor_id,
-                    "status": "confirmed",
-                    "google_event_id": event.get('id')
-                })
+            try:
+                if 'summary' in event and 'start' in event:
+                    start = event['start'].get('dateTime', event['start'].get('date'))
+                    
+                    # Parse the datetime
+                    if 'T' in start:
+                        event_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                        formatted_time = event_time.strftime('%A %I:%M %p')
+                    else:
+                        # All day event
+                        formatted_time = "All Day"
+                    
+                    # Extract patient name and reason from event summary
+                    summary = event.get('summary', 'Appointment')
+                    description = event.get('description', '')
+                    
+                    # Try to parse "Patient: Name - Reason: Description" format
+                    if ' - ' in summary:
+                        parts = summary.split(' - ')
+                        patient_name = parts[0].replace('Patient: ', '').strip()
+                        reason = parts[1].replace('Reason: ', '').strip() if len(parts) > 1 else 'Appointment'
+                    else:
+                        patient_name = summary
+                        reason = description or 'Appointment'
+                    
+                    appointments.append({
+                        "patient": patient_name,
+                        "time": formatted_time,
+                        "reason": reason,
+                        "location": "Google Calendar",
+                        "doctor_id": doctor_id,
+                        "status": "confirmed",
+                        "google_event_id": event.get('id')
+                    })
+                    synced_count += 1
+            except Exception as event_error:
+                print(f"Error processing event {event.get('id', 'unknown')}: {event_error}")
+                continue
         
+        print(f"Synced {synced_count} appointments from Google Calendar")
         return True
+        
     except Exception as e:
         print(f"Error syncing from Google Calendar: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def create_google_calendar_event(patient, time, reason):
@@ -250,46 +297,104 @@ def delete_google_calendar_event(event_id):
 @login_required
 def google_calendar_auth():
     """Start Google Calendar OAuth flow"""
-    flow = Flow.from_client_secrets_file(
-        CLIENT_SECRETS_FILE,
-        scopes=SCOPES,
-        redirect_uri=url_for('google_calendar_callback', _external=True)
-    )
-    
-    authorization_url, state = flow.authorization_url(
-        access_type='offline',
-        include_granted_scopes='true'
-    )
-    
-    session['state'] = state
-    return redirect(authorization_url)
+    try:
+        flow = Flow.from_client_secrets_file(
+            CLIENT_SECRETS_FILE,
+            scopes=SCOPES,
+            redirect_uri=OAUTH_REDIRECT_URI
+        )
+        
+        authorization_url, state = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true',
+            prompt='consent'  # Force consent screen to ensure we get refresh token
+        )
+        
+        session['state'] = state
+        return redirect(authorization_url)
+    except Exception as e:
+        print(f"Error starting OAuth flow: {e}")
+        return redirect(url_for('clinic_dashboard', error='oauth_start_failed'))
 
 @app.route('/google-calendar-callback')
 @login_required
 def google_calendar_callback():
     """Handle Google Calendar OAuth callback"""
-    state = session.get('state')
-    
-    flow = Flow.from_client_secrets_file(
-        CLIENT_SECRETS_FILE,
-        scopes=SCOPES,
-        state=state,
-        redirect_uri=url_for('google_calendar_callback', _external=True)
-    )
-    
-    flow.fetch_token(authorization_response=request.url)
-    
-    # Save credentials
-    doctor_id = current_user.get_id()
-    token_file = f'token_{doctor_id}.json'
-    
-    with open(token_file, 'w') as token:
-        token.write(flow.credentials.to_json())
-    
-    # Sync calendar after successful authentication
-    sync_from_google_calendar()
-    
-    return redirect(url_for('clinic_dashboard', connected=True))
+    try:
+        state = session.get('state')
+        
+        if not state:
+            print("No state found in session")
+            return redirect(url_for('clinic_dashboard', error='no_state'))
+        
+        # Check for error parameter in callback
+        if request.args.get('error'):
+            error = request.args.get('error')
+            print(f"OAuth error: {error}")
+            return redirect(url_for('clinic_dashboard', error=f'oauth_error_{error}'))
+        
+        flow = Flow.from_client_secrets_file(
+            CLIENT_SECRETS_FILE,
+            scopes=SCOPES,
+            state=state,
+            redirect_uri=OAUTH_REDIRECT_URI
+        )
+        
+        # Use the full URL including query parameters
+        authorization_response = request.url
+        
+        # Handle HTTPS vs HTTP in callback URL
+        if authorization_response.startswith('http://') and 'onrender.com' in authorization_response:
+            authorization_response = authorization_response.replace('http://', 'https://')
+        
+        print(f"Authorization response URL: {authorization_response}")
+        
+        # Fetch the token with better error handling
+        try:
+            flow.fetch_token(authorization_response=authorization_response)
+        except Exception as token_error:
+            print(f"Token fetch error: {token_error}")
+            # Try without the warning-causing validation
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message=".*Scope has changed.*")
+                flow.fetch_token(authorization_response=authorization_response)
+        
+        # Save credentials
+        doctor_id = current_user.get_id()
+        token_file = f'token_{doctor_id}.json'
+        
+        # Ensure we have credentials
+        if not flow.credentials:
+            print("No credentials received from OAuth flow")
+            return redirect(url_for('clinic_dashboard', error='no_credentials'))
+        
+        # Save to file
+        try:
+            with open(token_file, 'w') as token:
+                token.write(flow.credentials.to_json())
+            print(f"Credentials saved to {token_file}")
+        except Exception as save_error:
+            print(f"Error saving credentials: {save_error}")
+            return redirect(url_for('clinic_dashboard', error='save_failed'))
+        
+        # Try to sync calendar
+        try:
+            sync_success = sync_from_google_calendar()
+            print(f"Calendar sync result: {sync_success}")
+        except Exception as sync_error:
+            print(f"Calendar sync error: {sync_error}")
+            # Don't fail the whole process if sync fails
+        
+        # Clear session state
+        session.pop('state', None)
+        
+        return redirect(url_for('clinic_dashboard', connected='true'))
+        
+    except Exception as e:
+        print(f"Callback error: {e}")
+        import traceback
+        traceback.print_exc()
+        return redirect(url_for('clinic_dashboard', error='callback_failed'))
 
 # Helper function to parse appointment commands
 def parse_appointment_command(command):

@@ -617,15 +617,64 @@
       const button = document.querySelector('.theme-toggle');
       button.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
 
-      // Check URL for connection success
+      // Check URL parameters for connection status or errors
       const urlParams = new URLSearchParams(window.location.search);
+      const status = document.getElementById('google-status');
+      
       if (urlParams.get('connected') === 'true') {
-        const status = document.getElementById('google-status');
         if (status) {
           status.style.display = 'block';
           status.className = 'status-message success';
           status.textContent = '✅ Google Calendar connected successfully! Appointments synced.';
+          
+          // Update connection status display
+          const indicator = document.querySelector('.status-indicator');
+          const statusText = document.getElementById('connection-status');
+          if (indicator) indicator.classList.add('connected');
+          if (statusText) statusText.textContent = '✅ Connected to Google Calendar';
+          
+          // Hide connect button, show sync button
+          const connectBtn = document.getElementById('google-connect-btn');
+          if (connectBtn) connectBtn.style.display = 'none';
         }
+      } else if (urlParams.get('error')) {
+        const error = urlParams.get('error');
+        let errorMessage = 'Connection failed. Please try again.';
+        
+        switch(error) {
+          case 'oauth_start_failed':
+            errorMessage = 'Failed to start Google authentication. Please check your setup.';
+            break;
+          case 'no_state':
+            errorMessage = 'Authentication state lost. Please try connecting again.';
+            break;
+          case 'no_credentials':
+            errorMessage = 'No credentials received from Google. Please try again.';
+            break;
+          case 'save_failed':
+            errorMessage = 'Failed to save Google credentials. Please contact support.';
+            break;
+          case 'callback_failed':
+            errorMessage = 'Google authentication callback failed. Please try again.';
+            break;
+          default:
+            if (error.startsWith('oauth_error_')) {
+              const oauthError = error.replace('oauth_error_', '');
+              errorMessage = `Google OAuth error: ${oauthError}. Please try again.`;
+            }
+        }
+        
+        if (status) {
+          status.style.display = 'block';
+          status.className = 'status-message error';
+          status.textContent = `❌ ${errorMessage}`;
+        }
+      }
+      
+      // Clean up URL parameters after displaying status
+      if (urlParams.get('connected') || urlParams.get('error')) {
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
       }
     });
   </script>
