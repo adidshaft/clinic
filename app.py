@@ -401,56 +401,115 @@ def book_appointment():
         })
 
 # Patient AI endpoint
+# Replace the /api/ask endpoint in your app.py with this fixed version:
+
 @app.route('/api/ask', methods=['POST'])
 def ask():
     data = request.json
-    user_input = data.get("message")
+    user_input = data.get("message", "")
     location = data.get("location", "unknown")
 
+    if not user_input.strip():
+        return jsonify({"response": "Please enter your health concern."})
+
     # Handle appointment requests with availability check
-    name = "New Patient"
     reason = user_input
-    time = "Tomorrow 10 AM"  # Default placeholder
+    time = "Tomorrow 10:00 AM"  # Default placeholder
     
-    # Extract time from user input
-    if "friday" in user_input.lower():
-        if "10" in user_input or "10am" in user_input.lower():
+    # Extract time from user input with better parsing
+    user_input_lower = user_input.lower()
+    
+    # Day parsing
+    if "friday" in user_input_lower:
+        if "10" in user_input_lower or "10am" in user_input_lower:
             time = "Friday 10:00 AM"
+        elif "11" in user_input_lower or "11am" in user_input_lower:
+            time = "Friday 11:00 AM"
+        elif "2" in user_input_lower or "2pm" in user_input_lower:
+            time = "Friday 2:00 PM"
+        elif "3" in user_input_lower or "3pm" in user_input_lower:
+            time = "Friday 3:00 PM"
         else:
-            time = "Friday Morning"
-    elif "saturday" in user_input.lower():
-        if "11" in user_input or "11am" in user_input.lower():
+            time = "Friday 10:00 AM"
+    elif "saturday" in user_input_lower:
+        if "11" in user_input_lower or "11am" in user_input_lower:
             time = "Saturday 11:00 AM"
+        elif "10" in user_input_lower or "10am" in user_input_lower:
+            time = "Saturday 10:00 AM"
+        elif "2" in user_input_lower or "2pm" in user_input_lower:
+            time = "Saturday 2:00 PM"
         else:
-            time = "Saturday Morning"
-    elif "sunday" in user_input.lower():
-        if "9" in user_input or "9am" in user_input.lower():
+            time = "Saturday 11:00 AM"
+    elif "sunday" in user_input_lower:
+        if "9" in user_input_lower or "9am" in user_input_lower:
             time = "Sunday 9:00 AM"
+        elif "10" in user_input_lower or "10am" in user_input_lower:
+            time = "Sunday 10:00 AM"
         else:
-            time = "Sunday Morning"
-    elif "monday" in user_input.lower():
-        if "2" in user_input or "2pm" in user_input.lower():
+            time = "Sunday 9:00 AM"
+    elif "monday" in user_input_lower:
+        if "2" in user_input_lower or "2pm" in user_input_lower:
             time = "Monday 2:00 PM"
+        elif "3" in user_input_lower or "3pm" in user_input_lower:
+            time = "Monday 3:00 PM"
+        elif "10" in user_input_lower or "10am" in user_input_lower:
+            time = "Monday 10:00 AM"
         else:
-            time = "Monday Afternoon"
-    elif "tomorrow" in user_input.lower():
+            time = "Monday 2:00 PM"
+    elif "tuesday" in user_input_lower:
+        time = "Tuesday 10:00 AM"
+    elif "wednesday" in user_input_lower:
+        time = "Wednesday 10:00 AM"
+    elif "thursday" in user_input_lower:
+        time = "Thursday 10:00 AM"
+    elif "tomorrow" in user_input_lower:
         time = "Tomorrow 10:00 AM"
-    elif "today" in user_input.lower():
-        time = "Today (if available)"
-    
+    elif "today" in user_input_lower:
+        time = "Today 2:00 PM"
+
     # Check for appointment request keywords
-    if any(word in user_input.lower() for word in ["appointment", "book", "schedule", "see doctor", "visit", "consultation"]):
+    appointment_keywords = [
+        "appointment", "book", "schedule", "see doctor", "visit", 
+        "consultation", "meet", "checkup", "exam", "appointment"
+    ]
+    
+    is_appointment_request = any(word in user_input_lower for word in appointment_keywords)
+    
+    if is_appointment_request:
         # Check if this time slot is already taken
-        existing_appointment = next((apt for apt in appointments if apt.get("time") == time and apt.get("doctor_id") == "drlee"), None)
+        existing_appointment = next((apt for apt in appointments 
+                                   if apt.get("time") == time and 
+                                   apt.get("doctor_id") == "drlee"), None)
         
         if existing_appointment:
-            response_text = f"❌ Sorry, Dr. Lee is not available at {time}. That slot is already booked. Please try a different time."
+            # Suggest alternative times
+            alternative_times = [
+                "Friday 11:00 AM", "Saturday 10:00 AM", "Monday 3:00 PM", 
+                "Tuesday 10:00 AM", "Wednesday 2:00 PM"
+            ]
+            
+            # Find an available alternative
+            available_alternative = None
+            for alt_time in alternative_times:
+                if not next((apt for apt in appointments 
+                           if apt.get("time") == alt_time and 
+                           apt.get("doctor_id") == "drlee"), None):
+                    available_alternative = alt_time
+                    break
+            
+            if available_alternative:
+                response_text = f"❌ Sorry, Dr. Lee is not available at {time}. That slot is already booked. However, Dr. Lee is available at {available_alternative}. Would you like to book this appointment?"
+            else:
+                response_text = f"❌ Sorry, Dr. Lee is not available at {time}. That slot is already booked. Please try a different time or contact us directly."
         else:
-            # Show availability and ask for confirmation
-            response_text = f"✅ Great! Dr. Lee is available at {time} for your concern: '{reason}'. Would you like to book this appointment?"
+            # Show availability with the exact pattern the frontend expects
+            response_text = f"✅ Great! Dr. Lee is available at {time} for your concern about '{reason}'. Would you like to book this appointment?"
     else:
-        # Just health inquiry, don't check availability
-        response_text = f"Thank you for your health inquiry about '{reason}'. If you'd like to schedule an appointment, please mention 'appointment' or 'book' in your message."
+        # Just health inquiry, provide helpful response and suggest booking
+        if any(symptom in user_input_lower for symptom in ["headache", "pain", "sick", "fever", "cough", "cold"]):
+            response_text = f"I understand you're experiencing health concerns about '{reason}'. For proper diagnosis and treatment, I recommend scheduling an appointment with Dr. Lee. You can say something like 'I would like to book an appointment for Friday 10am' to schedule a visit."
+        else:
+            response_text = f"Thank you for your health inquiry about '{reason}'. If you'd like to schedule an appointment with Dr. Lee, please mention 'appointment' or 'book' along with your preferred day and time."
 
     return jsonify({"response": response_text})
 

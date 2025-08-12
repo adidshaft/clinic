@@ -198,12 +198,35 @@
     .booking-buttons {
       margin-top: 15px;
       display: none;
+      gap: 10px;
     }
 
     .booking-buttons button {
       margin: 5px;
       min-width: auto;
       flex: none;
+      padding: 10px 20px;
+      font-weight: bold;
+      border-radius: 8px;
+    }
+
+    .btn-book {
+      background: var(--success-color) !important;
+      color: white !important;
+    }
+
+    .btn-book:hover {
+      background: #218838 !important;
+    }
+
+    .btn-cancel {
+      background: var(--border-color) !important;
+      color: var(--text-color) !important;
+    }
+
+    .btn-cancel:hover {
+      background: var(--text-color) !important;
+      color: var(--bg-color) !important;
     }
 
     #location-info {
@@ -289,6 +312,9 @@
         width: 100%;
         margin-bottom: 10px;
       }
+      .booking-buttons {
+        flex-direction: column;
+      }
     }
   </style>
 </head>
@@ -301,7 +327,7 @@
     <div id="step1" class="form-step active">
       <h2>Describe your health concern:</h2>
       
-      <textarea id="input" rows="5" placeholder="Please describe your symptoms or health concerns in detail..."></textarea>
+      <textarea id="input" rows="5" placeholder="Please describe your symptoms or health concerns in detail... (e.g., 'I have a headache, can I book appointment Saturday 11am?')"></textarea>
       
       <div class="button-group">
         <button onclick="send()">Submit</button>
@@ -313,8 +339,8 @@
         
         <!-- Appointment booking buttons (hidden by default) -->
         <div id="booking-buttons" class="booking-buttons">
-          <button onclick="showPatientForm()" style="background: var(--success-color); margin-right: 10px;">✅ Yes, Book Appointment</button>
-          <button onclick="cancelBooking()" style="background: var(--border-color); color: var(--text-color);">❌ No, Cancel</button>
+          <button class="btn-book" onclick="showPatientForm()">✅ Yes, Book Appointment</button>
+          <button class="btn-cancel" onclick="cancelBooking()">❌ No, Cancel</button>
         </div>
       </div>
     </div>
@@ -449,12 +475,12 @@
     </div>
   </div>
 
-  <!-- Keep using your existing script.js file -->
+  <!-- Include the enhanced script -->
   <script src="/static/script.js"></script>
   
-  <!-- Enhanced functionality -->
+  <!-- Enhanced booking system functionality -->
   <script>
-    // Global variables
+    // Global variables for the enhanced booking system
     let currentStep = 1;
     let appointmentData = {
       healthConcern: '',
@@ -484,8 +510,26 @@
     }
 
     function showPatientForm() {
-      showStep(2);
+      // Store the appointment data from the initial interaction
+      appointmentData.healthConcern = document.getElementById("input").value;
+      appointmentData.location = userLocation || '';
+      
+      // Extract appointment time from the AI response
+      const responseText = document.getElementById("response").innerText;
+      const timeMatch = responseText.match(/available at ([^.?!]+)/i);
+      if (timeMatch) {
+        appointmentData.appointmentTime = timeMatch[1].trim();
+      }
+      
+      // Hide booking buttons and show patient form
       document.getElementById('booking-buttons').style.display = 'none';
+      showStep(2);
+    }
+
+    function cancelBooking() {
+      document.getElementById("response").innerText = `❌ Booking Cancelled. Feel free to ask about other available times.`;
+      document.getElementById('booking-buttons').style.display = 'none';
+      pendingAppointment = null;
     }
 
     function startNewBooking() {
@@ -650,73 +694,41 @@
       `;
     }
 
+    // Override the confirmAppointment function for Step 3
     async function confirmAppointment() {
-      const confirmButton = event.target;
-      confirmButton.disabled = true;
-      confirmButton.textContent = 'Booking...';
+      // Check if we're in Step 3 (final confirmation)
+      if (currentStep === 3) {
+        const confirmButton = event.target;
+        confirmButton.disabled = true;
+        confirmButton.textContent = 'Booking...';
 
-      try {
-        const response = await fetch('/api/book-appointment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(appointmentData)
-        });
+        try {
+          const response = await fetch('/api/book-appointment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(appointmentData)
+          });
 
-        const result = await response.json();
-        
-        if (result.success) {
-          document.getElementById('confirmationMessage').innerHTML = `
-            <strong>Dr. Lee</strong> will see you at <strong>${appointmentData.appointmentTime}</strong><br>
-            <strong>Confirmation ID:</strong> ${result.confirmationId}<br><br>
-            Please arrive 15 minutes early and bring a valid ID.
-          `;
-          showStep(4);
-        } else {
-          alert('Booking failed: ' + result.error);
+          const result = await response.json();
+          
+          if (result.success) {
+            document.getElementById('confirmationMessage').innerHTML = `
+              <strong>Dr. Lee</strong> will see you at <strong>${appointmentData.appointmentTime}</strong><br>
+              <strong>Confirmation ID:</strong> ${result.confirmationId}<br><br>
+              Please arrive 15 minutes early and bring a valid ID.
+            `;
+            showStep(4);
+          } else {
+            alert('Booking failed: ' + result.error);
+            confirmButton.disabled = false;
+            confirmButton.textContent = '✅ Confirm Appointment';
+          }
+        } catch (error) {
+          alert('Network error. Please try again.');
           confirmButton.disabled = false;
           confirmButton.textContent = '✅ Confirm Appointment';
         }
-      } catch (error) {
-        alert('Network error. Please try again.');
-        confirmButton.disabled = false;
-        confirmButton.textContent = '✅ Confirm Appointment';
       }
-    }
-
-    // Override the original send function
-    const originalSend = window.send;
-    window.send = async function() {
-      const message = document.getElementById("input").value;
-      appointmentData.healthConcern = message;
-      appointmentData.location = userLocation || '';
-      
-      // Call original send function
-      await originalSend();
-      
-      // Check for booking buttons
-      setTimeout(() => {
-        const responseElement = document.getElementById("response");
-        const responseText = responseElement.innerText.toLowerCase();
-        
-        if (responseText.includes('would you like to book') && 
-            responseText.includes('available')) {
-          
-          // Extract appointment time from response
-          const timeMatch = responseText.match(/available at ([^.]+)/);
-          if (timeMatch) {
-            appointmentData.appointmentTime = timeMatch[1].trim();
-          }
-          
-          document.getElementById('booking-buttons').style.display = 'block';
-        } else {
-          document.getElementById('booking-buttons').style.display = 'none';
-        }
-      }, 200);
-    };
-
-    function cancelBooking() {
-      document.getElementById("response").innerText = `❌ Booking Cancelled. Feel free to ask about other available times.`;
-      document.getElementById('booking-buttons').style.display = 'none';
     }
 
     // Enhanced location display
@@ -741,40 +753,3 @@
           } catch (error) {
             locationElement.textContent = `📍 Location detected (coordinates available)`;
           }
-        }, (error) => {
-          locationElement.textContent = `📍 Location access denied. Please enable location for better service.`;
-        });
-      } else {
-        locationElement.textContent = `📍 Geolocation is not supported by this browser.`;
-      }
-    }
-
-    // Simple theme toggle functionality
-    function toggleTheme() {
-      const currentTheme = document.documentElement.getAttribute('data-theme');
-      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', newTheme);
-      localStorage.setItem('theme', newTheme);
-      
-      const button = document.querySelector('.theme-toggle');
-      if (button) {
-        button.textContent = newTheme === 'dark' ? '☀️' : '🌙';
-      }
-    }
-
-    // Initialize everything on page load
-    document.addEventListener('DOMContentLoaded', function() {
-      // Set theme
-      const savedTheme = localStorage.getItem('theme') || 'light';
-      document.documentElement.setAttribute('data-theme', savedTheme);
-      const button = document.querySelector('.theme-toggle');
-      if (button) {
-        button.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
-      }
-      
-      // Initialize location display
-      updateLocationDisplay();
-    });
-  </script>
-</body>
-</html>
