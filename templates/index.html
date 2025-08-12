@@ -13,6 +13,7 @@
       --primary-color: #007bff;
       --primary-hover: #0056b3;
       --success-color: #28a745;
+      --error-color: #dc3545;
     }
 
     [data-theme="dark"] {
@@ -23,6 +24,7 @@
       --primary-color: #4dabf7;
       --primary-hover: #339af0;
       --success-color: #51cf66;
+      --error-color: #ff6b6b;
     }
 
     /* Basic Styling */
@@ -52,7 +54,60 @@
       color: var(--primary-color);
     }
 
-    textarea {
+    .step-indicator {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 30px;
+      gap: 10px;
+    }
+
+    .step {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--border-color);
+      color: var(--text-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      transition: all 0.3s ease;
+    }
+
+    .step.active {
+      background: var(--primary-color);
+      color: white;
+    }
+
+    .step.completed {
+      background: var(--success-color);
+      color: white;
+    }
+
+    .form-step {
+      display: none;
+    }
+
+    .form-step.active {
+      display: block;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+      color: var(--text-color);
+    }
+
+    .required {
+      color: var(--error-color);
+    }
+
+    input, select, textarea {
       width: 100%;
       padding: 15px;
       border: 2px solid var(--border-color);
@@ -61,12 +116,18 @@
       background: var(--bg-color);
       color: var(--text-color);
       box-sizing: border-box;
-      resize: vertical;
+      transition: border-color 0.3s ease;
     }
 
-    textarea:focus {
+    input:focus, select:focus, textarea:focus {
       outline: none;
       border-color: var(--primary-color);
+    }
+
+    .input-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
     }
 
     .button-group {
@@ -93,6 +154,21 @@
       background-color: var(--primary-hover);
     }
 
+    button:disabled {
+      background-color: var(--border-color);
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background-color: var(--border-color);
+      color: var(--text-color);
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--text-color);
+      color: var(--bg-color);
+    }
+
     .response-box {
       background: var(--bg-color);
       border: 2px solid var(--border-color);
@@ -115,6 +191,7 @@
       cursor: pointer;
       font-size: 20px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      z-index: 1000;
     }
 
     /* Booking buttons */
@@ -159,6 +236,41 @@
       transform: translateY(-2px);
     }
 
+    .error-message {
+      color: var(--error-color);
+      font-size: 14px;
+      margin-top: 5px;
+    }
+
+    .success-message {
+      background: rgba(40, 167, 69, 0.1);
+      color: var(--success-color);
+      border: 1px solid var(--success-color);
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+
+    .appointment-summary {
+      background: var(--bg-color);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+
+    .summary-item {
+      display: flex;
+      justify-content: space-between;
+      margin: 10px 0;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .summary-item:last-child {
+      border-bottom: none;
+    }
+
     /* Mobile Responsive */
     @media (max-width: 768px) {
       body {
@@ -166,6 +278,9 @@
       }
       .container {
         padding: 20px;
+      }
+      .input-group {
+        grid-template-columns: 1fr;
       }
       .button-group {
         flex-direction: column;
@@ -182,22 +297,142 @@
   <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">🌙</button>
 
   <div class="container">
-    <h2>Describe your health concern:</h2>
-    
-    <textarea id="input" rows="5" placeholder="Please describe your symptoms or health concerns in detail..."></textarea>
-    
-    <div class="button-group">
-      <button onclick="send()">Submit</button>
-      <button onclick="startVoice()">🎤 Speak</button>
+    <!-- Step 1: Initial Health Concern -->
+    <div id="step1" class="form-step active">
+      <h2>Describe your health concern:</h2>
+      
+      <textarea id="input" rows="5" placeholder="Please describe your symptoms or health concerns in detail..."></textarea>
+      
+      <div class="button-group">
+        <button onclick="send()">Submit</button>
+        <button onclick="startVoice()">🎤 Speak</button>
+      </div>
+
+      <div class="response-box">
+        <b>Response:</b> <span id="response">Your response will appear here...</span>
+        
+        <!-- Appointment booking buttons (hidden by default) -->
+        <div id="booking-buttons" class="booking-buttons">
+          <button onclick="showPatientForm()" style="background: var(--success-color); margin-right: 10px;">✅ Yes, Book Appointment</button>
+          <button onclick="cancelBooking()" style="background: var(--border-color); color: var(--text-color);">❌ No, Cancel</button>
+        </div>
+      </div>
     </div>
 
-    <div class="response-box">
-      <b>Response:</b> <span id="response">Your response will appear here...</span>
+    <!-- Step 2: Patient Information -->
+    <div id="step2" class="form-step">
+      <div class="step-indicator">
+        <div class="step completed">1</div>
+        <div class="step active">2</div>
+        <div class="step">3</div>
+      </div>
+
+      <h2>Patient Information</h2>
       
-      <!-- Appointment booking buttons (hidden by default) -->
-      <div id="booking-buttons" class="booking-buttons">
-        <button onclick="confirmBooking()" style="background: var(--success-color); margin-right: 10px;">✅ Yes, Book Appointment</button>
-        <button onclick="cancelBooking()" style="background: var(--border-color); color: var(--text-color);">❌ No, Cancel</button>
+      <form id="patientForm">
+        <div class="input-group">
+          <div class="form-group">
+            <label for="firstName">First Name <span class="required">*</span></label>
+            <input type="text" id="firstName" name="firstName" required>
+            <div class="error-message" id="firstNameError"></div>
+          </div>
+          
+          <div class="form-group">
+            <label for="lastName">Last Name <span class="required">*</span></label>
+            <input type="text" id="lastName" name="lastName" required>
+            <div class="error-message" id="lastNameError"></div>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <div class="form-group">
+            <label for="age">Age <span class="required">*</span></label>
+            <input type="number" id="age" name="age" min="1" max="120" required>
+            <div class="error-message" id="ageError"></div>
+          </div>
+          
+          <div class="form-group">
+            <label for="gender">Gender <span class="required">*</span></label>
+            <select id="gender" name="gender" required>
+              <option value="">Select Gender</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+              <option value="prefer-not-to-say">Prefer not to say</option>
+            </select>
+            <div class="error-message" id="genderError"></div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="medicalId">Medical ID / Insurance Number</label>
+          <input type="text" id="medicalId" name="medicalId" placeholder="Optional - Enter your medical ID or insurance number">
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email Address <span class="required">*</span></label>
+          <input type="email" id="email" name="email" required placeholder="your.email@example.com">
+          <div class="error-message" id="emailError"></div>
+        </div>
+
+        <div class="form-group">
+          <label for="phone">Phone Number <span class="required">*</span></label>
+          <input type="tel" id="phone" name="phone" required placeholder="+1 (555) 123-4567">
+          <div class="error-message" id="phoneError"></div>
+        </div>
+
+        <div class="form-group">
+          <label for="emergencyContact">Emergency Contact Name</label>
+          <input type="text" id="emergencyContact" name="emergencyContact" placeholder="Optional - Emergency contact person">
+        </div>
+
+        <div class="form-group">
+          <label for="emergencyPhone">Emergency Contact Phone</label>
+          <input type="tel" id="emergencyPhone" name="emergencyPhone" placeholder="Optional - Emergency contact phone">
+        </div>
+
+        <div class="form-group">
+          <label for="allergies">Known Allergies</label>
+          <textarea id="allergies" name="allergies" rows="3" placeholder="Optional - List any known allergies or medications to avoid"></textarea>
+        </div>
+
+        <div class="button-group">
+          <button type="button" class="btn-secondary" onclick="goBackToStep1()">← Back</button>
+          <button type="button" onclick="validateAndProceed()">Continue →</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Step 3: Confirmation -->
+    <div id="step3" class="form-step">
+      <div class="step-indicator">
+        <div class="step completed">1</div>
+        <div class="step completed">2</div>
+        <div class="step active">3</div>
+      </div>
+
+      <h2>Confirm Your Appointment</h2>
+      
+      <div class="appointment-summary" id="appointmentSummary">
+        <!-- Summary will be populated by JavaScript -->
+      </div>
+
+      <div class="button-group">
+        <button type="button" class="btn-secondary" onclick="goBackToStep2()">← Back</button>
+        <button type="button" onclick="confirmAppointment()">✅ Confirm Appointment</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Success -->
+    <div id="step4" class="form-step">
+      <div class="success-message">
+        <h2 style="color: var(--success-color); margin: 0 0 15px 0;">🎉 Appointment Confirmed!</h2>
+        <p id="confirmationMessage">Your appointment has been successfully booked.</p>
+        <p><strong>Confirmation details have been sent to your email address.</strong></p>
+      </div>
+
+      <div class="button-group">
+        <button onclick="startNewBooking()">Book Another Appointment</button>
       </div>
     </div>
 
@@ -219,48 +454,265 @@
   
   <!-- Enhanced functionality -->
   <script>
-    // Store last message for booking
-    let lastPatientMessage = "";
-    
-    // Override the send function to add booking button logic
+    // Global variables
+    let currentStep = 1;
+    let appointmentData = {
+      healthConcern: '',
+      appointmentTime: '',
+      patientInfo: {},
+      location: ''
+    };
+
+    // Step navigation functions
+    function showStep(stepNumber) {
+      // Hide all steps
+      document.querySelectorAll('.form-step').forEach(step => {
+        step.classList.remove('active');
+      });
+      
+      // Show target step
+      document.getElementById(`step${stepNumber}`).classList.add('active');
+      currentStep = stepNumber;
+    }
+
+    function goBackToStep1() {
+      showStep(1);
+    }
+
+    function goBackToStep2() {
+      showStep(2);
+    }
+
+    function showPatientForm() {
+      showStep(2);
+      document.getElementById('booking-buttons').style.display = 'none';
+    }
+
+    function startNewBooking() {
+      // Reset form and data
+      appointmentData = {
+        healthConcern: '',
+        appointmentTime: '',
+        patientInfo: {},
+        location: ''
+      };
+      document.getElementById('input').value = '';
+      document.getElementById('response').textContent = 'Your response will appear here...';
+      document.getElementById('patientForm').reset();
+      clearAllErrors();
+      showStep(1);
+    }
+
+    // Form validation functions
+    function validateEmail(email) {
+      const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return re.test(email);
+    }
+
+    function validatePhone(phone) {
+      const re = /^[\+]?[1-9][\d]{0,15}$/;
+      return re.test(phone.replace(/[\s\-\(\)]/g, ''));
+    }
+
+    function showError(fieldId, message) {
+      const errorElement = document.getElementById(fieldId + 'Error');
+      if (errorElement) {
+        errorElement.textContent = message;
+      }
+    }
+
+    function clearError(fieldId) {
+      const errorElement = document.getElementById(fieldId + 'Error');
+      if (errorElement) {
+        errorElement.textContent = '';
+      }
+    }
+
+    function clearAllErrors() {
+      ['firstName', 'lastName', 'age', 'gender', 'email', 'phone'].forEach(clearError);
+    }
+
+    function validateAndProceed() {
+      clearAllErrors();
+      let isValid = true;
+
+      // Get form values
+      const firstName = document.getElementById('firstName').value.trim();
+      const lastName = document.getElementById('lastName').value.trim();
+      const age = document.getElementById('age').value;
+      const gender = document.getElementById('gender').value;
+      const email = document.getElementById('email').value.trim();
+      const phone = document.getElementById('phone').value.trim();
+
+      // Validate required fields
+      if (!firstName) {
+        showError('firstName', 'First name is required');
+        isValid = false;
+      }
+
+      if (!lastName) {
+        showError('lastName', 'Last name is required');
+        isValid = false;
+      }
+
+      if (!age || age < 1 || age > 120) {
+        showError('age', 'Please enter a valid age (1-120)');
+        isValid = false;
+      }
+
+      if (!gender) {
+        showError('gender', 'Please select your gender');
+        isValid = false;
+      }
+
+      if (!email) {
+        showError('email', 'Email address is required');
+        isValid = false;
+      } else if (!validateEmail(email)) {
+        showError('email', 'Please enter a valid email address');
+        isValid = false;
+      }
+
+      if (!phone) {
+        showError('phone', 'Phone number is required');
+        isValid = false;
+      } else if (!validatePhone(phone)) {
+        showError('phone', 'Please enter a valid phone number');
+        isValid = false;
+      }
+
+      if (isValid) {
+        // Save patient info
+        appointmentData.patientInfo = {
+          firstName,
+          lastName,
+          age: parseInt(age),
+          gender,
+          email,
+          phone,
+          medicalId: document.getElementById('medicalId').value.trim(),
+          emergencyContact: document.getElementById('emergencyContact').value.trim(),
+          emergencyPhone: document.getElementById('emergencyPhone').value.trim(),
+          allergies: document.getElementById('allergies').value.trim()
+        };
+
+        showAppointmentSummary();
+        showStep(3);
+      }
+    }
+
+    function showAppointmentSummary() {
+      const summary = document.getElementById('appointmentSummary');
+      const patient = appointmentData.patientInfo;
+      
+      summary.innerHTML = `
+        <h3 style="margin-top: 0; color: var(--primary-color);">Appointment Details</h3>
+        <div class="summary-item">
+          <span><strong>Patient:</strong></span>
+          <span>${patient.firstName} ${patient.lastName}</span>
+        </div>
+        <div class="summary-item">
+          <span><strong>Age:</strong></span>
+          <span>${patient.age} years old</span>
+        </div>
+        <div class="summary-item">
+          <span><strong>Gender:</strong></span>
+          <span>${patient.gender.charAt(0).toUpperCase() + patient.gender.slice(1)}</span>
+        </div>
+        <div class="summary-item">
+          <span><strong>Email:</strong></span>
+          <span>${patient.email}</span>
+        </div>
+        <div class="summary-item">
+          <span><strong>Phone:</strong></span>
+          <span>${patient.phone}</span>
+        </div>
+        ${patient.medicalId ? `
+        <div class="summary-item">
+          <span><strong>Medical ID:</strong></span>
+          <span>${patient.medicalId}</span>
+        </div>
+        ` : ''}
+        <div class="summary-item">
+          <span><strong>Appointment Time:</strong></span>
+          <span>${appointmentData.appointmentTime}</span>
+        </div>
+        <div class="summary-item">
+          <span><strong>Health Concern:</strong></span>
+          <span>${appointmentData.healthConcern}</span>
+        </div>
+        ${patient.allergies ? `
+        <div class="summary-item">
+          <span><strong>Allergies:</strong></span>
+          <span>${patient.allergies}</span>
+        </div>
+        ` : ''}
+      `;
+    }
+
+    async function confirmAppointment() {
+      const confirmButton = event.target;
+      confirmButton.disabled = true;
+      confirmButton.textContent = 'Booking...';
+
+      try {
+        const response = await fetch('/api/book-appointment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(appointmentData)
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+          document.getElementById('confirmationMessage').innerHTML = `
+            <strong>Dr. Lee</strong> will see you at <strong>${appointmentData.appointmentTime}</strong><br>
+            <strong>Confirmation ID:</strong> ${result.confirmationId}<br><br>
+            Please arrive 15 minutes early and bring a valid ID.
+          `;
+          showStep(4);
+        } else {
+          alert('Booking failed: ' + result.error);
+          confirmButton.disabled = false;
+          confirmButton.textContent = '✅ Confirm Appointment';
+        }
+      } catch (error) {
+        alert('Network error. Please try again.');
+        confirmButton.disabled = false;
+        confirmButton.textContent = '✅ Confirm Appointment';
+      }
+    }
+
+    // Override the original send function
     const originalSend = window.send;
     window.send = async function() {
       const message = document.getElementById("input").value;
-      lastPatientMessage = message;
+      appointmentData.healthConcern = message;
+      appointmentData.location = userLocation || '';
       
-      // Call original send function first
+      // Call original send function
       await originalSend();
       
-      // After response is received, check if we should show booking buttons
+      // Check for booking buttons
       setTimeout(() => {
         const responseElement = document.getElementById("response");
         const responseText = responseElement.innerText.toLowerCase();
         
-        // Show booking buttons if slot is available and asks for confirmation
         if (responseText.includes('would you like to book') && 
             responseText.includes('available')) {
-          console.log("Slot available - showing booking buttons");
+          
+          // Extract appointment time from response
+          const timeMatch = responseText.match(/available at ([^.]+)/);
+          if (timeMatch) {
+            appointmentData.appointmentTime = timeMatch[1].trim();
+          }
+          
           document.getElementById('booking-buttons').style.display = 'block';
         } else {
           document.getElementById('booking-buttons').style.display = 'none';
         }
       }, 200);
     };
-
-    // Booking functions
-    async function confirmBooking() {
-      const confirmRes = await fetch("/api/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: `CONFIRM_BOOKING: ${lastPatientMessage}`,
-          location: userLocation || ""
-        })
-      });
-      const confirmData = await confirmRes.json();
-      document.getElementById("response").innerText = confirmData.response;
-      document.getElementById('booking-buttons').style.display = 'none';
-    }
 
     function cancelBooking() {
       document.getElementById("response").innerText = `❌ Booking Cancelled. Feel free to ask about other available times.`;
@@ -276,8 +728,6 @@
         locationElement.textContent = "📍 Getting your location...";
         
         navigator.geolocation.getCurrentPosition(async (position) => {
-          console.log("Location obtained");
-          
           try {
             locationElement.textContent = "📍 Getting location name...";
             
@@ -286,14 +736,12 @@
             const cityName = data.city || data.locality || data.principalSubdivision || "Unknown Location";
             
             locationElement.textContent = `📍 Location: ${cityName}`;
-            console.log("City name found:", cityName);
+            appointmentData.location = cityName;
             
           } catch (error) {
-            console.error("Error getting city name:", error);
             locationElement.textContent = `📍 Location detected (coordinates available)`;
           }
         }, (error) => {
-          console.error("Geolocation error:", error);
           locationElement.textContent = `📍 Location access denied. Please enable location for better service.`;
         });
       } else {
@@ -308,7 +756,6 @@
       document.documentElement.setAttribute('data-theme', newTheme);
       localStorage.setItem('theme', newTheme);
       
-      // Update button emoji
       const button = document.querySelector('.theme-toggle');
       if (button) {
         button.textContent = newTheme === 'dark' ? '☀️' : '🌙';
