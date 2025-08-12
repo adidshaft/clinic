@@ -3,7 +3,6 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from openai import OpenAI
 import os
 import re
-from datetime import datetime, timedelta
 
 # Load environment variable (optional: only needed locally)
 from dotenv import load_dotenv
@@ -57,9 +56,6 @@ def internal_error(e):
 
 # In-memory storage for appointments
 appointments = []
-
-# Google Calendar integration flag
-google_calendar_connected = False
 
 # Initialize OpenAI client (for SDK v1.x)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -126,17 +122,6 @@ def parse_appointment_command(command):
     
     return None
 
-# Helper function to sync with Google Calendar
-def sync_to_google_calendar(action, appointment_data):
-    """Simulate Google Calendar sync"""
-    if not google_calendar_connected:
-        return False
-    
-    # In a real implementation, you would use Google Calendar API here
-    # For now, we'll just simulate the sync
-    print(f"Google Calendar Sync: {action} - {appointment_data}")
-    return True
-
 @app.route('/api/ask', methods=['POST'])
 def ask():
     data = request.json
@@ -194,9 +179,6 @@ def ask():
                 "status": "confirmed"
             }
             appointments.append(new_appointment)
-            
-            # Sync to Google Calendar
-            sync_to_google_calendar('add', new_appointment)
             
             response_text = f"✅ Your appointment has been successfully booked for {time}. Dr. Lee will see you for: {reason}. Please arrive 15 minutes early."
         
@@ -288,9 +270,6 @@ def clinic_ai():
             }
             appointments.append(new_appointment)
             
-            # Sync to Google Calendar
-            sync_to_google_calendar('add', new_appointment)
-            
             return jsonify({"response": f"✅ Appointment added successfully! {patient} scheduled for {time} - {reason}."})
         
         elif action == 'modify':
@@ -309,11 +288,7 @@ def clinic_ai():
                 return jsonify({"response": f"❌ Cannot reschedule. {new_time} slot is already booked by {conflict['patient']}."})
             
             # Update appointment
-            old_appointment = existing.copy()
             existing['time'] = new_time
-            
-            # Sync to Google Calendar
-            sync_to_google_calendar('modify', {'old': old_appointment, 'new': existing})
             
             return jsonify({"response": f"✅ Appointment rescheduled! {existing['patient']} moved from {old_time} to {new_time}."})
         
@@ -328,9 +303,6 @@ def clinic_ai():
             
             appointments.remove(existing)
             
-            # Sync to Google Calendar
-            sync_to_google_calendar('delete', existing)
-            
             return jsonify({"response": f"✅ Appointment deleted! {existing['patient']}'s {time} appointment has been cancelled."})
     
     # Handle other commands (block time, etc.)
@@ -343,47 +315,6 @@ def clinic_ai():
     
     # Fallback response with examples
     return jsonify({"response": f"🤖 I can help you manage appointments! Try commands like:\n• 'Add appointment for John Doe on Monday 3pm for checkup'\n• 'Reschedule Friday 10am appointment to Friday 2pm'\n• 'Cancel the Saturday 11am appointment'\n\nYour command: '{msg}' - Please be more specific."})
-
-@app.route('/api/google-calendar-connect', methods=['POST'])
-def google_calendar_connect():
-    """Handle Google Calendar connection"""
-    global google_calendar_connected
-    
-    try:
-        # In a real implementation, you would:
-        # 1. Redirect to Google OAuth
-        # 2. Get authorization code
-        # 3. Exchange for access token
-        # 4. Store credentials securely
-        
-        # For demo purposes, we'll simulate successful connection
-        google_calendar_connected = True
-        
-        # Sync existing appointments to Google Calendar
-        doc_id = current_user.get_id()
-        existing_appointments = [a for a in appointments if a.get("doctor_id") == doc_id]
-        
-        for appointment in existing_appointments:
-            sync_to_google_calendar('add', appointment)
-        
-        return jsonify({
-            "success": True,
-            "message": f"Connected to Google Calendar! Synced {len(existing_appointments)} existing appointments."
-        })
-        
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        })
-
-@app.route('/api/google-calendar-status', methods=['GET'])
-def google_calendar_status():
-    """Check Google Calendar connection status"""
-    return jsonify({
-        "connected": google_calendar_connected,
-        "sync_count": len([a for a in appointments if a.get("doctor_id") == current_user.get_id()]) if current_user.is_authenticated else 0
-    })
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -8,7 +8,7 @@
     :root {
       --bg-color: #ffffff;
       --text-color: #333333;
-      --card-bg: #f8f9fa;
+      --card-bg: #f8fafc;
       --border-color: #e0e0e0;
       --primary-color: #007bff;
       --primary-hover: #0056b3;
@@ -22,6 +22,7 @@
       --border-color: #404040;
       --primary-color: #4dabf7;
       --primary-hover: #339af0;
+      --success-color: #51cf66;
     }
 
     /* Basic Styling */
@@ -116,7 +117,12 @@
       box-shadow: 0 2px 10px rgba(0,0,0,0.2);
     }
 
-    /* Additional Styles for New Elements */
+    /* Booking buttons */
+    .booking-buttons {
+      margin-top: 15px;
+      display: none;
+    }
+
     .booking-buttons button {
       margin: 5px;
       min-width: auto;
@@ -126,10 +132,12 @@
     #location-info {
       opacity: 0.8;
       transition: all 0.3s ease;
-    }
-
-    #location-info:hover {
-      opacity: 1;
+      margin-top: 15px;
+      padding: 10px;
+      background: var(--bg-color);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 14px;
     }
 
     .doctor-login-btn {
@@ -151,7 +159,7 @@
       transform: translateY(-2px);
     }
 
-    --success-color: #28a745;
+    /* Mobile Responsive */
     @media (max-width: 768px) {
       body {
         padding: 10px;
@@ -176,7 +184,7 @@
   <div class="container">
     <h2>Describe your health concern:</h2>
     
-    <textarea id="input" rows="5" cols="50" placeholder="Please describe your symptoms or health concerns in detail..."></textarea>
+    <textarea id="input" rows="5" placeholder="Please describe your symptoms or health concerns in detail..."></textarea>
     
     <div class="button-group">
       <button onclick="send()">Submit</button>
@@ -187,19 +195,14 @@
       <b>Response:</b> <span id="response">Your response will appear here...</span>
       
       <!-- Appointment booking buttons (hidden by default) -->
-      <div id="booking-buttons" style="display: none; margin-top: 15px;">
+      <div id="booking-buttons" class="booking-buttons">
         <button onclick="confirmBooking()" style="background: var(--success-color); margin-right: 10px;">✅ Yes, Book Appointment</button>
         <button onclick="cancelBooking()" style="background: var(--border-color); color: var(--text-color);">❌ No, Cancel</button>
-      </div>
-      
-      <!-- Debug button - remove this after testing -->
-      <div style="margin-top: 10px;">
-        <button onclick="testButtons()" style="background: orange; font-size: 12px; padding: 5px 10px;">🔧 Test Booking Buttons</button>
       </div>
     </div>
 
     <!-- Location Display -->
-    <div id="location-info" style="margin-top: 15px; padding: 10px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; color: var(--text-color);">
+    <div id="location-info">
       <span id="location-text">📍 Detecting your location...</span>
     </div>
 
@@ -216,9 +219,15 @@
   
   <!-- Enhanced functionality -->
   <script>
-    // Override the send function to add booking button detection
+    // Store last message for booking
+    let lastPatientMessage = "";
+    
+    // Override the send function to add booking button logic
     const originalSend = window.send;
     window.send = async function() {
+      const message = document.getElementById("input").value;
+      lastPatientMessage = message;
+      
       // Call original send function first
       await originalSend();
       
@@ -238,15 +247,13 @@
       }, 200);
     };
 
-    // Simple booking confirmation function
+    // Booking functions
     async function confirmBooking() {
-      const message = document.getElementById("input").value;
-      
       const confirmRes = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: `CONFIRM_BOOKING: ${message}`,
+          message: `CONFIRM_BOOKING: ${lastPatientMessage}`,
           location: userLocation || ""
         })
       });
@@ -255,22 +262,9 @@
       document.getElementById('booking-buttons').style.display = 'none';
     }
 
-    // Cancel booking function
     function cancelBooking() {
       document.getElementById("response").innerText = `❌ Booking Cancelled. Feel free to ask about other available times.`;
       document.getElementById('booking-buttons').style.display = 'none';
-    }
-
-    // Test function to debug booking buttons
-    function testButtons() {
-      console.log("Testing booking buttons");
-      const bookingDiv = document.getElementById('booking-buttons');
-      if (bookingDiv) {
-        bookingDiv.style.display = 'block';
-        document.getElementById("response").innerText = "🧪 Test Mode: Dr. Lee is available for your concern. Would you like to book this appointment?";
-      } else {
-        console.error("booking-buttons element not found!");
-      }
     }
 
     // Enhanced location display
