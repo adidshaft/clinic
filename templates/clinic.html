@@ -196,6 +196,187 @@
       background: var(--primary-hover);
     }
 
+    /* Email Management Styles */
+    .email-section {
+      background: var(--card-bg);
+      padding: 20px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      margin-bottom: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .email-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .email-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--danger-color);
+    }
+
+    .email-indicator.connected {
+      background: var(--success-color);
+    }
+
+    .email-controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin: 20px 0;
+    }
+
+    .email-button {
+      padding: 12px 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .btn-test {
+      background: #17a2b8;
+      color: white;
+    }
+
+    .btn-test:hover {
+      background: #138496;
+    }
+
+    .btn-reminder {
+      background: var(--warning-color);
+      color: white;
+    }
+
+    .btn-reminder:hover {
+      background: #e69500;
+    }
+
+    .appointment-item {
+      background: var(--bg-color);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 15px;
+      margin: 10px 0;
+      position: relative;
+    }
+
+    .appointment-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
+    .appointment-actions button {
+      padding: 6px 12px;
+      font-size: 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .btn-send-reminder {
+      background: var(--warning-color);
+      color: white;
+    }
+
+    .btn-send-reminder:hover {
+      background: #e69500;
+    }
+
+    .btn-cancel-apt {
+      background: var(--danger-color);
+      color: white;
+    }
+
+    .btn-cancel-apt:hover {
+      background: #c82333;
+    }
+
+    .email-log {
+      background: var(--bg-color);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 15px;
+      margin-top: 15px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 12px;
+    }
+
+    .log-entry {
+      margin: 5px 0;
+      padding: 3px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+
+    .log-success {
+      color: var(--success-color);
+    }
+
+    .log-error {
+      color: var(--danger-color);
+    }
+
+    .log-info {
+      color: var(--primary-color);
+    }
+
+    .email-test-form {
+      background: var(--bg-color);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 15px;
+      display: none;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      color: var(--text-color);
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background: var(--bg-color);
+      color: var(--text-color);
+      box-sizing: border-box;
+    }
+
     textarea {
       width: 100%;
       padding: 15px;
@@ -355,6 +536,18 @@
         align-items: flex-start;
         gap: 5px;
       }
+
+      .email-controls {
+        grid-template-columns: 1fr;
+      }
+      
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+      
+      .appointment-actions {
+        flex-direction: column;
+      }
     }
   </style>
 </head>
@@ -371,6 +564,73 @@
   </div>
 
   <h1>Doctor's Dashboard</h1>
+
+  <!-- Email Management Section -->
+  <div class="email-section">
+    <h3>📧 Email Notification System</h3>
+    
+    <!-- Email Status -->
+    <div class="email-status">
+      <div class="email-indicator" id="email-indicator"></div>
+      <span id="email-status-text">Checking email configuration...</span>
+    </div>
+    
+    <!-- Email Controls -->
+    <div class="email-controls">
+      <button class="email-button btn-test" onclick="toggleEmailTest()">
+        🧪 Test Email System
+      </button>
+      
+      <button class="email-button btn-reminder" onclick="sendBulkReminders()">
+        📢 Send All Reminders
+      </button>
+      
+      <button class="email-button" onclick="checkEmailStatus()" style="background: var(--primary-color); color: white;">
+        🔄 Check Status
+      </button>
+      
+      <button class="email-button" onclick="viewEmailLog()" style="background: var(--border-color); color: var(--text-color);">
+        📋 View Email Log
+      </button>
+    </div>
+    
+    <!-- Email Test Form -->
+    <div id="email-test-form" class="email-test-form">
+      <h4>🧪 Email System Testing</h4>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label for="test-email-address">Test Email Address:</label>
+          <input type="email" id="test-email-address" placeholder="your.email@example.com" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="test-email-type">Email Type:</label>
+          <select id="test-email-type">
+            <option value="confirmation">Patient Confirmation</option>
+            <option value="reminder">Appointment Reminder</option>
+            <option value="doctor_notification">Doctor Notification</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <button onclick="sendTestEmail()" class="email-button btn-test" style="width: auto;">
+          📤 Send Test Email
+        </button>
+        <button onclick="toggleEmailTest()" class="email-button" style="width: auto; background: var(--border-color); color: var(--text-color);">
+          ❌ Cancel
+        </button>
+      </div>
+    </div>
+    
+    <!-- Email Activity Log -->
+    <div id="email-log" class="email-log" style="display: none;">
+      <div id="email-log-content">
+        <div class="log-entry log-info">📧 Email system initialized</div>
+      </div>
+    </div>
+  </div>
 
   <!-- Google Calendar Integration Section -->
   <div class="google-calendar-section">
@@ -407,28 +667,61 @@
 
   <!-- Main Dashboard Grid -->
   <div class="dashboard-grid">
-    <!-- Appointments Section -->
+    <!-- Enhanced Appointments Section with Email Actions -->
     <div class="section">
-      <h2>📋 Live Appointments</h2>
+      <h2>📋 Live Appointments <span style="font-size: 14px; color: var(--text-color); opacity: 0.7;">(with Email Actions)</span></h2>
       
       {% if appointments %}
         {% for appt in appointments %}
-          <div class="appointment">
-            <strong>{{ appt.patient }}</strong> — {{ appt.time }}
-            {% if appt.location == 'Google Calendar' %}
-              <span class="google-calendar-badge">📅 Google</span>
-            {% endif %}
-            <br>
-            <em>Reason: {{ appt.reason }}</em>
-            {% if appt.location %}
-              <div class="appointment-source">Source: {{ appt.location }}</div>
+          <div class="appointment appointment-item">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div>
+                <strong>{{ appt.patient }}</strong> — {{ appt.time }}
+                {% if appt.location == 'Google Calendar' %}
+                  <span class="google-calendar-badge">📅 Google</span>
+                {% endif %}
+                <br>
+                <em>Reason: {{ appt.reason }}</em>
+                {% if appt.confirmationId %}
+                  <br><small style="color: var(--primary-color);">ID: {{ appt.confirmationId }}</small>
+                {% endif %}
+                {% if appt.location %}
+                  <div class="appointment-source">Source: {{ appt.location }}</div>
+                {% endif %}
+              </div>
+              
+              <!-- Email Status Indicator -->
+              <div style="text-align: right; font-size: 12px;">
+                <div id="email-status-{{ appt.confirmationId }}" style="color: var(--success-color);">📧 Ready</div>
+              </div>
+            </div>
+            
+            <!-- Appointment Actions -->
+            {% if appt.confirmationId %}
+            <div class="appointment-actions">
+              <button class="btn-send-reminder" onclick="sendAppointmentReminder('{{ appt.confirmationId }}')">
+                🔔 Send Reminder
+              </button>
+              
+              <button class="btn-send-reminder" onclick="sendCustomEmail('{{ appt.confirmationId }}')" style="background: var(--primary-color);">
+                📧 Custom Email
+              </button>
+              
+              <button class="btn-cancel-apt" onclick="cancelAppointmentWithEmail('{{ appt.confirmationId }}')">
+                ❌ Cancel & Notify
+              </button>
+              
+              <button onclick="viewPatientDetails('{{ appt.confirmationId }}')" style="background: var(--border-color); color: var(--text-color);">
+                👤 Patient Info
+              </button>
+            </div>
             {% endif %}
           </div>
         {% endfor %}
       {% else %}
         <div class="empty-state">
           <p>📅 No appointments scheduled yet.</p>
-          <small>Connect Google Calendar to sync existing appointments, or patients can book through the patient portal.</small>
+          <small>When patients book appointments, email confirmations will be sent automatically.</small>
         </div>
       {% endif %}
     </div>
@@ -445,6 +738,15 @@
         <span class="command-example" onclick="fillCommand('Cancel the Saturday 11am appointment')">❌ Cancel the Saturday 11am appointment</span>
         <span class="command-example" onclick="fillCommand('Block tomorrow from 2pm to 4pm')">🚫 Block tomorrow from 2pm to 4pm</span>
       </div>
+
+      <!-- Enhanced Email Commands -->
+      <div class="ai-examples" style="margin-top: 15px;">
+        <h4>📧 Email Commands (Click to use):</h4>
+        <span class="command-example" onclick="fillCommand('Send reminder emails to all patients with appointments tomorrow')">📢 Send reminder emails to all patients with appointments tomorrow</span>
+        <span class="command-example" onclick="fillCommand('Check email delivery status for last 24 hours')">📊 Check email delivery status for last 24 hours</span>
+        <span class="command-example" onclick="fillCommand('Send test confirmation email to my email address')">🧪 Send test confirmation email to my email address</span>
+        <span class="command-example" onclick="fillCommand('Update email template for appointment confirmations')">✏️ Update email template for appointment confirmations</span>
+      </div>
       
       <textarea id="input" rows="3" placeholder="Tell the AI to add, modify, or cancel appointments. All changes will sync to Google Calendar automatically if connected."></textarea>
       
@@ -460,6 +762,339 @@
   </div>
 
   <script>
+    // Email Management JavaScript
+    let emailLogVisible = false;
+    let emailTestVisible = false;
+
+    // Check email system status on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      checkEmailStatus();
+      
+      // Check every 30 seconds
+      setInterval(checkEmailStatus, 30000);
+
+      // Load saved theme
+      const savedTheme = localStorage.getItem('theme') || 'light';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+      const button = document.querySelector('.theme-toggle');
+      button.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+
+      // Check URL parameters for connection status or errors
+      const urlParams = new URLSearchParams(window.location.search);
+      const status = document.getElementById('google-status');
+      
+      if (urlParams.get('connected') === 'true') {
+        if (status) {
+          status.style.display = 'block';
+          status.className = 'status-message success';
+          status.textContent = '✅ Google Calendar connected successfully! Appointments synced.';
+          
+          // Update connection status display
+          const indicator = document.querySelector('.status-indicator');
+          const statusText = document.getElementById('connection-status');
+          if (indicator) indicator.classList.add('connected');
+          if (statusText) statusText.textContent = '✅ Connected to Google Calendar';
+        }
+      } else if (urlParams.get('error')) {
+        const error = urlParams.get('error');
+        let errorMessage = 'Connection failed. Please try again.';
+        
+        switch(error) {
+          case 'oauth_start_failed':
+            errorMessage = 'Failed to start Google authentication. Please check your setup.';
+            break;
+          case 'no_state':
+            errorMessage = 'Authentication state lost. Please try connecting again.';
+            break;
+          case 'no_credentials':
+            errorMessage = 'No credentials received from Google. Please try again.';
+            break;
+          case 'save_failed':
+            errorMessage = 'Failed to save Google credentials. Please contact support.';
+            break;
+          case 'callback_failed':
+            errorMessage = 'Google authentication callback failed. Please try again.';
+            break;
+          default:
+            if (error.startsWith('oauth_error_')) {
+              const oauthError = error.replace('oauth_error_', '');
+              errorMessage = `Google OAuth error: ${oauthError}. Please try again.`;
+            }
+        }
+        
+        if (status) {
+          status.style.display = 'block';
+          status.className = 'status-message error';
+          status.textContent = `❌ ${errorMessage}`;
+        }
+      }
+      
+      // Clean up URL parameters after displaying status
+      if (urlParams.get('connected') || urlParams.get('error')) {
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
+    });
+
+    async function checkEmailStatus() {
+      try {
+        const response = await fetch('/api/email-status', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        
+        const indicator = document.getElementById('email-indicator');
+        const statusText = document.getElementById('email-status-text');
+        
+        if (data.configured) {
+          indicator.classList.add('connected');
+          statusText.textContent = '✅ Email system configured and ready';
+          statusText.style.color = 'var(--success-color)';
+        } else {
+          indicator.classList.remove('connected');
+          statusText.textContent = '❌ Email system not configured - check SendGrid settings';
+          statusText.style.color = 'var(--danger-color)';
+        }
+        
+        addToEmailLog('info', `Email status checked: ${data.configured ? 'Ready' : 'Not configured'}`);
+        
+      } catch (error) {
+        const indicator = document.getElementById('email-indicator');
+        const statusText = document.getElementById('email-status-text');
+        
+        indicator.classList.remove('connected');
+        statusText.textContent = '⚠️ Unable to check email status';
+        statusText.style.color = 'var(--warning-color)';
+        
+        addToEmailLog('error', `Status check failed: ${error.message}`);
+      }
+    }
+
+    function toggleEmailTest() {
+      const form = document.getElementById('email-test-form');
+      emailTestVisible = !emailTestVisible;
+      form.style.display = emailTestVisible ? 'block' : 'none';
+      
+      if (emailTestVisible) {
+        document.getElementById('test-email-address').focus();
+      }
+    }
+
+    async function sendTestEmail() {
+      const email = document.getElementById('test-email-address').value;
+      const type = document.getElementById('test-email-type').value;
+      
+      if (!email) {
+        alert('Please enter a test email address');
+        return;
+      }
+      
+      const button = event.target;
+      const originalText = button.textContent;
+      button.textContent = '📤 Sending...';
+      button.disabled = true;
+      
+      try {
+        const response = await fetch('/api/test-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            test_email: email,
+            type: type,
+            doctor_email: type === 'doctor_notification' ? email : undefined
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          addToEmailLog('success', `✅ Test ${type} email sent to ${email}`);
+          alert(`✅ Test email sent successfully to ${email}`);
+          toggleEmailTest(); // Close the form
+        } else {
+          addToEmailLog('error', `❌ Test email failed: ${data.error}`);
+          alert(`❌ Test email failed: ${data.error}`);
+        }
+        
+      } catch (error) {
+        addToEmailLog('error', `❌ Network error: ${error.message}`);
+        alert(`❌ Network error: ${error.message}`);
+      } finally {
+        button.textContent = originalText;
+        button.disabled = false;
+      }
+    }
+
+    async function sendAppointmentReminder(confirmationId) {
+      const button = event.target;
+      const originalText = button.textContent;
+      button.textContent = '🔄 Sending...';
+      button.disabled = true;
+      
+      try {
+        const response = await fetch(`/api/send-reminder/${confirmationId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hours_before: 24 })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          addToEmailLog('success', `✅ Reminder sent for appointment ${confirmationId}`);
+          
+          // Update UI to show reminder sent
+          const statusEl = document.getElementById(`email-status-${confirmationId}`);
+          if (statusEl) {
+            statusEl.textContent = '📧 Reminder Sent';
+            statusEl.style.color = 'var(--success-color)';
+          }
+          
+          // Show success message
+          button.textContent = '✅ Sent';
+          button.style.background = 'var(--success-color)';
+          
+          setTimeout(() => {
+            button.textContent = originalText;
+            button.style.background = 'var(--warning-color)';
+            button.disabled = false;
+          }, 3000);
+          
+        } else {
+          addToEmailLog('error', `❌ Reminder failed for ${confirmationId}: ${data.error}`);
+          alert(`❌ Failed to send reminder: ${data.error}`);
+          button.textContent = originalText;
+          button.disabled = false;
+        }
+        
+      } catch (error) {
+        addToEmailLog('error', `❌ Reminder error: ${error.message}`);
+        alert(`❌ Network error: ${error.message}`);
+        button.textContent = originalText;
+        button.disabled = false;
+      }
+    }
+
+    async function cancelAppointmentWithEmail(confirmationId) {
+      if (!confirm('Are you sure you want to cancel this appointment? The patient will be notified via email.')) {
+        return;
+      }
+      
+      try {
+        const response = await fetch('/api/cancel-appointment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirmationId })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          addToEmailLog('success', `✅ Appointment ${confirmationId} cancelled, email sent`);
+          alert('✅ Appointment cancelled and patient notified via email');
+          
+          // Refresh the page to update the appointments list
+          setTimeout(() => location.reload(), 1000);
+        } else {
+          addToEmailLog('error', `❌ Cancellation failed: ${data.error}`);
+          alert(`❌ Failed to cancel appointment: ${data.error}`);
+        }
+        
+      } catch (error) {
+        addToEmailLog('error', `❌ Cancellation error: ${error.message}`);
+        alert(`❌ Network error: ${error.message}`);
+      }
+    }
+
+    async function sendBulkReminders() {
+      if (!confirm('Send reminder emails to all patients with appointments in the next 24 hours?')) {
+        return;
+      }
+      
+      const button = event.target;
+      const originalText = button.textContent;
+      button.textContent = '📤 Sending...';
+      button.disabled = true;
+      
+      try {
+        const response = await fetch('/api/send-bulk-reminders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          addToEmailLog('success', `✅ Bulk reminders sent: ${data.sent_count} emails`);
+          alert(`✅ Successfully sent ${data.sent_count} reminder emails`);
+        } else {
+          addToEmailLog('error', `❌ Bulk reminders failed: ${data.error}`);
+          alert(`❌ Failed to send bulk reminders: ${data.error}`);
+        }
+        
+      } catch (error) {
+        addToEmailLog('error', `❌ Bulk reminder error: ${error.message}`);
+        alert(`❌ Network error: ${error.message}`);
+      } finally {
+        button.textContent = originalText;
+        button.disabled = false;
+      }
+    }
+
+    function sendCustomEmail(confirmationId) {
+      const customMessage = prompt('Enter custom message for the patient:');
+      
+      if (!customMessage) {
+        return;
+      }
+      
+      // For now, just log this - you can implement custom email functionality
+      addToEmailLog('info', `📝 Custom email requested for ${confirmationId}: ${customMessage}`);
+      alert('Custom email feature coming soon! Message logged for manual follow-up.');
+    }
+
+    function viewPatientDetails(confirmationId) {
+      // This would show patient details in a modal or redirect to patient details page
+      addToEmailLog('info', `👤 Patient details viewed for appointment ${confirmationId}`);
+      alert(`Patient details for appointment ${confirmationId}\n\nThis would typically show:\n- Full patient information\n- Medical history\n- Contact preferences\n- Email history`);
+    }
+
+    function viewEmailLog() {
+      const log = document.getElementById('email-log');
+      emailLogVisible = !emailLogVisible;
+      log.style.display = emailLogVisible ? 'block' : 'none';
+      
+      if (emailLogVisible) {
+        // Scroll to bottom of log
+        log.scrollTop = log.scrollHeight;
+      }
+    }
+
+    function addToEmailLog(type, message) {
+      const logContent = document.getElementById('email-log-content');
+      const timestamp = new Date().toLocaleTimeString();
+      
+      const logEntry = document.createElement('div');
+      logEntry.className = `log-entry log-${type}`;
+      logEntry.textContent = `${timestamp} - ${message}`;
+      
+      logContent.appendChild(logEntry);
+      
+      // Keep only last 50 entries
+      const entries = logContent.children;
+      if (entries.length > 50) {
+        logContent.removeChild(entries[0]);
+      }
+      
+      // Auto-scroll to bottom if log is visible
+      if (emailLogVisible) {
+        const log = document.getElementById('email-log');
+        log.scrollTop = log.scrollHeight;
+      }
+    }
+
     // Quick command filler
     function fillCommand(command) {
       document.getElementById('input').value = command;
@@ -609,74 +1244,6 @@
       const button = document.querySelector('.theme-toggle');
       button.textContent = newTheme === 'dark' ? '☀️' : '🌙';
     }
-
-    // Load saved theme on page load
-    document.addEventListener('DOMContentLoaded', function() {
-      const savedTheme = localStorage.getItem('theme') || 'light';
-      document.documentElement.setAttribute('data-theme', savedTheme);
-      const button = document.querySelector('.theme-toggle');
-      button.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
-
-      // Check URL parameters for connection status or errors
-      const urlParams = new URLSearchParams(window.location.search);
-      const status = document.getElementById('google-status');
-      
-      if (urlParams.get('connected') === 'true') {
-        if (status) {
-          status.style.display = 'block';
-          status.className = 'status-message success';
-          status.textContent = '✅ Google Calendar connected successfully! Appointments synced.';
-          
-          // Update connection status display
-          const indicator = document.querySelector('.status-indicator');
-          const statusText = document.getElementById('connection-status');
-          if (indicator) indicator.classList.add('connected');
-          if (statusText) statusText.textContent = '✅ Connected to Google Calendar';
-          
-          // Hide connect button, show sync button
-          const connectBtn = document.getElementById('google-connect-btn');
-          if (connectBtn) connectBtn.style.display = 'none';
-        }
-      } else if (urlParams.get('error')) {
-        const error = urlParams.get('error');
-        let errorMessage = 'Connection failed. Please try again.';
-        
-        switch(error) {
-          case 'oauth_start_failed':
-            errorMessage = 'Failed to start Google authentication. Please check your setup.';
-            break;
-          case 'no_state':
-            errorMessage = 'Authentication state lost. Please try connecting again.';
-            break;
-          case 'no_credentials':
-            errorMessage = 'No credentials received from Google. Please try again.';
-            break;
-          case 'save_failed':
-            errorMessage = 'Failed to save Google credentials. Please contact support.';
-            break;
-          case 'callback_failed':
-            errorMessage = 'Google authentication callback failed. Please try again.';
-            break;
-          default:
-            if (error.startsWith('oauth_error_')) {
-              const oauthError = error.replace('oauth_error_', '');
-              errorMessage = `Google OAuth error: ${oauthError}. Please try again.`;
-            }
-        }
-        
-        if (status) {
-          status.style.display = 'block';
-          status.className = 'status-message error';
-          status.textContent = `❌ ${errorMessage}`;
-        }
-      }
-      
-      // Clean up URL parameters after displaying status
-      if (urlParams.get('connected') || urlParams.get('error')) {
-        const cleanUrl = window.location.pathname;
-        window.history.replaceState({}, document.title, cleanUrl);
-      }
-    });
   </script>
 </body>
 </html>

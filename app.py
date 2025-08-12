@@ -8,10 +8,6 @@ import json
 import warnings
 import uuid
 
-# SendGrid imports
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email, To, Content
-
 # Google Calendar imports
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -23,6 +19,15 @@ from googleapiclient.errors import HttpError
 from dotenv import load_dotenv
 load_dotenv()
 
+# Import our enhanced email service
+try:
+    from utils.email_notifications import EmailNotificationService
+    email_service = EmailNotificationService()
+    EMAIL_SERVICE_AVAILABLE = True
+except ImportError:
+    print("⚠️ Email service not available. Create utils/email_notifications.py to enable email functionality.")
+    EMAIL_SERVICE_AVAILABLE = False
+
 # Initialize Flask app
 app = Flask(__name__)
 app.secret_key = "your-secret-key"
@@ -31,9 +36,11 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
 
-# SendGrid Configuration
-SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
-FROM_EMAIL = 'noreply@clinic-vnpy.onrender.com'  # Replace with your verified sender
+# Configuration for doctor emails (add to environment variables)
+DOCTOR_EMAILS = {
+    "drlee": os.getenv('DR_LEE_EMAIL', 'dr.lee@clinic.com'),
+    "drsmith": os.getenv('DR_SMITH_EMAIL', 'dr.smith@clinic.com')
+}
 
 # Google Calendar configuration - Updated scopes
 SCOPES = [
@@ -98,232 +105,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 def index():
     return render_template('index.html')
 
-# Email helper functions
-def send_appointment_confirmation_email(patient_info, appointment_details):
-    """Send appointment confirmation email using SendGrid"""
-    if not SENDGRID_API_KEY:
-        print("SendGrid API key not configured")
-        return False
-    
-    try:
-        # Create the email content
-        subject = f"Appointment Confirmation - {appointment_details['time']}"
-        
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                .header {{ background: #007bff; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }}
-                .content {{ background: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px; }}
-                .appointment-details {{ background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }}
-                .detail-row {{ display: flex; justify-content: space-between; margin: 10px 0; padding: 5px 0; border-bottom: 1px solid #eee; }}
-                .footer {{ text-align: center; margin-top: 30px; color: #666; font-size: 14px; }}
-                .confirmation-id {{ background: #28a745; color: white; padding: 10px; text-align: center; border-radius: 4px; margin: 20px 0; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>🏥 AI Clinic</h1>
-                    <h2>Appointment Confirmation</h2>
-                </div>
-                
-                <div class="content">
-                    <p>Dear {patient_info['firstName']} {patient_info['lastName']},</p>
-                    
-                    <p>Your appointment has been successfully scheduled! Here are the details:</p>
-                    
-                    <div class="confirmation-id">
-                        <strong>Confirmation ID: {appointment_details['confirmationId']}</strong>
-                    </div>
-                    
-                    <div class="appointment-details">
-                        <h3>Appointment Details</h3>
-                        <div class="detail-row">
-                            <span><strong>Doctor:</strong></span>
-                            <span>Dr. Lee</span>
-                        </div>
-                        <div class="detail-row">
-                            <span><strong>Date & Time:</strong></span>
-                            <span>{appointment_details['time']}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span><strong>Reason:</strong></span>
-                            <span>{appointment_details['reason']}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span><strong>Patient:</strong></span>
-                            <span>{patient_info['firstName']} {patient_info['lastName']}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span><strong>Age:</strong></span>
-                            <span>{patient_info['age']} years old</span>
-                        </div>
-                        <div class="detail-row">
-                            <span><strong>Phone:</strong></span>
-                            <span>{patient_info['phone']}</span>
-                        </div>
-                        {f'''<div class="detail-row">
-                            <span><strong>Medical ID:</strong></span>
-                            <span>{patient_info['medicalId']}</span>
-                        </div>''' if patient_info.get('medicalId') else ''}
-                        {f'''<div class="detail-row">
-                            <span><strong>Known Allergies:</strong></span>
-                            <span>{patient_info['allergies']}</span>
-                        </div>''' if patient_info.get('allergies') else ''}
-                    </div>
-                    
-                    <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 4px; margin: 20px 0;">
-                        <h4 style="margin: 0 0 10px 0; color: #856404;">📋 Important Reminders:</h4>
-                        <ul style="margin: 0; padding-left: 20px;">
-                            <li>Please arrive <strong>15 minutes early</strong> for check-in</li>
-                            <li>Bring a valid government-issued ID</li>
-                            <li>Bring your insurance card (if applicable)</li>
-                            <li>List of current medications</li>
-                            <li>Wear a mask if you have any cold symptoms</li>
-                        </ul>
-                    </div>
-                    
-                    <p>If you need to reschedule or cancel your appointment, please contact us at least 24 hours in advance.</p>
-                    
-                    <p>We look forward to seeing you!</p>
-                    
-                    <p>Best regards,<br>
-                    <strong>AI Clinic Team</strong></p>
-                </div>
-                
-                <div class="footer">
-                    <p>This is an automated message. Please do not reply to this email.</p>
-                    <p>If you have questions, please visit our website or call our office.</p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        
-        # Create the email
-        message = Mail(
-            from_email=FROM_EMAIL,
-            to_emails=patient_info['email'],
-            subject=subject,
-            html_content=html_content
-        )
-        
-        # Send the email
-        sg = SendGridAPIClient(api_key=SENDGRID_API_KEY)
-        response = sg.send(message)
-        
-        print(f"Email sent successfully. Status code: {response.status_code}")
-        return True
-        
-    except Exception as e:
-        print(f"Error sending email: {e}")
-        return False
-
-def send_doctor_notification_email(doctor_email, patient_info, appointment_details):
-    """Send new appointment notification to doctor"""
-    if not SENDGRID_API_KEY:
-        return False
-    
-    try:
-        subject = f"New Appointment Booked - {appointment_details['time']}"
-        
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                .header {{ background: #28a745; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }}
-                .content {{ background: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px; }}
-                .patient-details {{ background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }}
-                .detail-row {{ display: flex; justify-content: space-between; margin: 10px 0; padding: 5px 0; border-bottom: 1px solid #eee; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>🏥 AI Clinic - Doctor Portal</h1>
-                    <h2>New Appointment Notification</h2>
-                </div>
-                
-                <div class="content">
-                    <p>Dear Dr. Lee,</p>
-                    
-                    <p>A new appointment has been booked through the patient portal:</p>
-                    
-                    <div class="patient-details">
-                        <h3>Patient Information</h3>
-                        <div class="detail-row">
-                            <span><strong>Patient:</strong></span>
-                            <span>{patient_info['firstName']} {patient_info['lastName']}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span><strong>Age:</strong></span>
-                            <span>{patient_info['age']} years old ({patient_info['gender']})</span>
-                        </div>
-                        <div class="detail-row">
-                            <span><strong>Contact:</strong></span>
-                            <span>{patient_info['phone']} | {patient_info['email']}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span><strong>Appointment Time:</strong></span>
-                            <span>{appointment_details['time']}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span><strong>Chief Complaint:</strong></span>
-                            <span>{appointment_details['reason']}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span><strong>Confirmation ID:</strong></span>
-                            <span>{appointment_details['confirmationId']}</span>
-                        </div>
-                        {f'''<div class="detail-row">
-                            <span><strong>Medical ID:</strong></span>
-                            <span>{patient_info['medicalId']}</span>
-                        </div>''' if patient_info.get('medicalId') else ''}
-                        {f'''<div class="detail-row">
-                            <span><strong>Emergency Contact:</strong></span>
-                            <span>{patient_info['emergencyContact']} ({patient_info['emergencyPhone']})</span>
-                        </div>''' if patient_info.get('emergencyContact') else ''}
-                        {f'''<div class="detail-row">
-                            <span><strong>Known Allergies:</strong></span>
-                            <span style="color: #dc3545; font-weight: bold;">{patient_info['allergies']}</span>
-                        </div>''' if patient_info.get('allergies') else ''}
-                    </div>
-                    
-                    <p>The appointment has been automatically added to your Google Calendar (if connected).</p>
-                    
-                    <p>Best regards,<br>
-                    <strong>AI Clinic System</strong></p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        
-        message = Mail(
-            from_email=FROM_EMAIL,
-            to_emails=doctor_email,
-            subject=subject,
-            html_content=html_content
-        )
-        
-        sg = SendGridAPIClient(api_key=SENDGRID_API_KEY)
-        response = sg.send(message)
-        
-        print(f"Doctor notification sent. Status code: {response.status_code}")
-        return True
-        
-    except Exception as e:
-        print(f"Error sending doctor notification: {e}")
-        return False
-
-# Google Calendar Helper Functions (keeping existing functions)
+# Google Calendar Helper Functions
 def get_google_calendar_service():
     """Get Google Calendar service object"""
     try:
@@ -451,7 +233,67 @@ Booked via AI Clinic Patient Portal"""
         print(f"Error creating Google Calendar event: {e}")
         return None
 
-# New appointment booking endpoint
+def sync_from_google_calendar():
+    """Sync appointments from Google Calendar"""
+    service = get_google_calendar_service()
+    if not service:
+        print("Cannot sync: Google Calendar service not available")
+        return
+    
+    try:
+        # Get events from the next 30 days
+        now = datetime.utcnow().isoformat() + 'Z'
+        future = (datetime.utcnow() + timedelta(days=30)).isoformat() + 'Z'
+        
+        events_result = service.events().list(
+            calendarId='primary',
+            timeMin=now,
+            timeMax=future,
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+        
+        events = events_result.get('items', [])
+        doctor_id = current_user.get_id()
+        
+        for event in events:
+            # Check if this event is already in our appointments
+            event_id = event.get('id')
+            existing = next((apt for apt in appointments 
+                           if apt.get("google_event_id") == event_id), None)
+            
+            if not existing:
+                # Add this Google Calendar event as an appointment
+                start = event['start'].get('dateTime', event['start'].get('date'))
+                summary = event.get('summary', 'Appointment')
+                description = event.get('description', '')
+                
+                # Parse the start time to a readable format
+                if 'T' in start:
+                    dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                    time_str = dt.strftime('%A %I:%M %p')
+                else:
+                    time_str = start
+                
+                appointment = {
+                    "patient": summary,
+                    "time": time_str,
+                    "reason": description[:100] if description else "Calendar appointment",
+                    "location": "Google Calendar",
+                    "doctor_id": doctor_id,
+                    "status": "confirmed",
+                    "google_event_id": event_id,
+                    "source": "google_calendar"
+                }
+                
+                appointments.append(appointment)
+        
+        print(f"Synced {len(events)} events from Google Calendar")
+        
+    except Exception as e:
+        print(f"Error syncing from Google Calendar: {e}")
+
+# Enhanced appointment booking endpoint with email notifications
 @app.route('/api/book-appointment', methods=['POST'])
 def book_appointment():
     """Complete appointment booking with patient details and email notifications"""
@@ -461,6 +303,16 @@ def book_appointment():
         health_concern = data.get('healthConcern', '')
         appointment_time = data.get('appointmentTime', '')
         location = data.get('location', '')
+        
+        # Validate required fields
+        required_fields = ['firstName', 'lastName', 'age', 'gender', 'email', 'phone']
+        missing_fields = [field for field in required_fields if not patient_info.get(field)]
+        
+        if missing_fields:
+            return jsonify({
+                "success": False,
+                "error": f"Missing required fields: {', '.join(missing_fields)}"
+            })
         
         # Generate confirmation ID
         confirmation_id = f"AC{datetime.now().strftime('%Y%m%d')}{str(uuid.uuid4())[:8].upper()}"
@@ -493,41 +345,62 @@ def book_appointment():
         # Add to appointments
         appointments.append(appointment)
         
-        # Create Google Calendar event
-        google_event_id = create_google_calendar_event(patient_info, appointment_time, health_concern)
-        if google_event_id:
-            appointment["google_event_id"] = google_event_id
-        
-        # Send confirmation email to patient
+        # Create appointment details for email
         appointment_details = {
             "time": appointment_time,
             "reason": health_concern,
             "confirmationId": confirmation_id
         }
         
-        email_sent = send_appointment_confirmation_email(patient_info, appointment_details)
+        # Send confirmation email to patient
+        patient_email_sent = False
+        if EMAIL_SERVICE_AVAILABLE:
+            patient_email_sent = email_service.send_appointment_confirmation(
+                patient_info, appointment_details
+            )
         
-        # Send notification to doctor (you can add doctor's email here)
-        doctor_email = "doctor@clinic.com"  # Replace with actual doctor email
-        send_doctor_notification_email(doctor_email, patient_info, appointment_details)
+        # Send notification to assigned doctor
+        doctor_email = DOCTOR_EMAILS.get("drlee")
+        doctor_email_sent = False
+        if EMAIL_SERVICE_AVAILABLE and doctor_email:
+            doctor_email_sent = email_service.send_doctor_notification(
+                doctor_email, patient_info, appointment_details
+            )
+        
+        # Create Google Calendar event (keep existing functionality)
+        google_event_id = None
+        try:
+            google_event_id = create_google_calendar_event(patient_info, appointment_time, health_concern)
+            if google_event_id:
+                appointment["google_event_id"] = google_event_id
+        except Exception as e:
+            print(f"⚠️ Google Calendar sync failed: {e}")
+        
+        # Log email results
+        email_status = {
+            "patient_email": "sent" if patient_email_sent else "failed" if EMAIL_SERVICE_AVAILABLE else "service_unavailable",
+            "doctor_email": "sent" if doctor_email_sent else "failed" if (EMAIL_SERVICE_AVAILABLE and doctor_email) else "no_email_configured"
+        }
+        
+        print(f"📧 Email Status - Patient: {email_status['patient_email']}, Doctor: {email_status['doctor_email']}")
         
         return jsonify({
             "success": True,
             "confirmationId": confirmation_id,
             "message": f"Appointment confirmed for {appointment_time}",
-            "emailSent": email_sent
+            "emailSent": patient_email_sent,
+            "googleCalendarSynced": google_event_id is not None,
+            "emailStatus": email_status
         })
         
     except Exception as e:
-        print(f"Error booking appointment: {e}")
+        print(f"❌ Error booking appointment: {e}")
         return jsonify({
             "success": False,
             "error": "Failed to book appointment. Please try again."
         })
 
-# Keep all existing routes and functions...
-# (I'll include the key ones but keeping the same structure)
-
+# Patient AI endpoint
 @app.route('/api/ask', methods=['POST'])
 def ask():
     data = request.json
@@ -581,8 +454,652 @@ def ask():
 
     return jsonify({"response": response_text})
 
-# Keep all existing Google Calendar and clinic routes...
-# (Including sync_from_google_calendar, parse_appointment_command, etc.)
+# Google Calendar OAuth routes
+@app.route('/api/google-calendar-connect', methods=['POST'])
+@login_required
+def google_calendar_connect():
+    """Initiate Google Calendar OAuth flow"""
+    try:
+        if not os.path.exists(CLIENT_SECRETS_FILE):
+            return jsonify({
+                "success": False,
+                "error": "Google OAuth not configured. Missing client_secret.json file."
+            })
+        
+        # Create flow instance
+        flow = Flow.from_client_secrets_file(
+            CLIENT_SECRETS_FILE,
+            scopes=SCOPES
+        )
+        flow.redirect_uri = OAUTH_REDIRECT_URI
+        
+        # Generate authorization URL
+        authorization_url, state = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true'
+        )
+        
+        # Store state in session
+        session['oauth_state'] = state
+        
+        return jsonify({
+            "success": True,
+            "redirect": True,
+            "redirect_url": authorization_url
+        })
+        
+    except Exception as e:
+        print(f"Error initiating Google OAuth: {e}")
+        return jsonify({
+            "success": False,
+            "error": f"OAuth initialization failed: {str(e)}"
+        })
+
+@app.route('/google-calendar-callback')
+@login_required
+def google_calendar_callback():
+    """Handle Google Calendar OAuth callback"""
+    try:
+        # Verify state parameter
+        state = session.get('oauth_state')
+        if not state:
+            return redirect('/clinic?error=no_state')
+        
+        # Create flow instance
+        flow = Flow.from_client_secrets_file(
+            CLIENT_SECRETS_FILE,
+            scopes=SCOPES,
+            state=state
+        )
+        flow.redirect_uri = OAUTH_REDIRECT_URI
+        
+        # Get authorization response
+        authorization_response = request.url
+        flow.fetch_token(authorization_response=authorization_response)
+        
+        # Save credentials
+        credentials = flow.credentials
+        doctor_id = current_user.get_id()
+        token_file = f'token_{doctor_id}.json'
+        
+        with open(token_file, 'w') as token:
+            token.write(credentials.to_json())
+        
+        # Clear session state
+        session.pop('oauth_state', None)
+        
+        # Sync existing appointments
+        sync_from_google_calendar()
+        
+        return redirect('/clinic?connected=true')
+        
+    except Exception as e:
+        print(f"OAuth callback error: {e}")
+        return redirect('/clinic?error=callback_failed')
+
+@app.route('/api/google-calendar-sync', methods=['POST'])
+@login_required
+def google_calendar_sync():
+    """Manually sync with Google Calendar"""
+    try:
+        sync_from_google_calendar()
+        return jsonify({
+            "success": True,
+            "message": "Calendar synced successfully"
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        })
+
+# Doctor AI assistant
+def parse_appointment_command(message):
+    """Parse doctor's natural language commands for appointment management"""
+    message = message.lower().strip()
+    
+    # ADD appointment patterns
+    add_patterns = [
+        r'add appointment for (\w+(?:\s+\w+)*) on (\w+(?:\s+\d+(?:am|pm))*) for (.+)',
+        r'create appointment for (\w+(?:\s+\w+)*) at (\w+(?:\s+\d+(?:am|pm))*) for (.+)',
+        r'schedule (\w+(?:\s+\w+)*) on (\w+(?:\s+\d+(?:am|pm))*) for (.+)'
+    ]
+    
+    for pattern in add_patterns:
+        match = re.search(pattern, message)
+        if match:
+            patient_name = match.group(1).title()
+            time = match.group(2).title()
+            reason = match.group(3)
+            return "add", {"patient": patient_name, "time": time, "reason": reason}
+    
+    # MODIFY appointment patterns
+    modify_patterns = [
+        r'reschedule (\w+(?:\s+\d+(?:am|pm))*) (?:appointment )?to (\w+(?:\s+\d+(?:am|pm))*)',
+        r'move (\w+(?:\s+\d+(?:am|pm))*) (?:appointment )?to (\w+(?:\s+\d+(?:am|pm))*)',
+        r'change (\w+(?:\s+\d+(?:am|pm))*) (?:appointment )?to (\w+(?:\s+\d+(?:am|pm))*)'
+    ]
+    
+    for pattern in modify_patterns:
+        match = re.search(pattern, message)
+        if match:
+            old_time = match.group(1).title()
+            new_time = match.group(2).title()
+            return "modify", {"old_time": old_time, "new_time": new_time}
+    
+    # DELETE appointment patterns
+    delete_patterns = [
+        r'cancel (?:the )?(\w+(?:\s+\d+(?:am|pm))*) appointment',
+        r'delete (?:the )?(\w+(?:\s+\d+(?:am|pm))*) appointment',
+        r'remove (?:the )?(\w+(?:\s+\d+(?:am|pm))*) appointment'
+    ]
+    
+    for pattern in delete_patterns:
+        match = re.search(pattern, message)
+        if match:
+            time = match.group(1).title()
+            return "delete", {"time": time}
+    
+    # BLOCK time patterns
+    block_patterns = [
+        r'block (\w+(?:\s+from\s+\d+(?:am|pm)\s+to\s+\d+(?:am|pm))*)',
+        r'reserve (\w+(?:\s+from\s+\d+(?:am|pm)\s+to\s+\d+(?:am|pm))*)'
+    ]
+    
+    for pattern in block_patterns:
+        match = re.search(pattern, message)
+        if match:
+            time_block = match.group(1).title()
+            return "block", {"time": time_block}
+    
+    return None, None
+
+@app.route('/api/clinic-ai', methods=['POST'])
+@login_required
+def clinic_ai():
+    """AI assistant for doctors to manage appointments"""
+    try:
+        data = request.json
+        message = data.get("message", "")
+        
+        if not message.strip():
+            return jsonify({"response": "Please enter a command."})
+        
+        # Parse the command
+        action, params = parse_appointment_command(message)
+        doctor_id = current_user.get_id()
+        
+        if action == "add":
+            # Add new appointment
+            appointment = {
+                "patient": params["patient"],
+                "time": params["time"],
+                "reason": params["reason"],
+                "location": "Doctor Added",
+                "doctor_id": doctor_id,
+                "status": "confirmed",
+                "confirmationId": f"DR{datetime.now().strftime('%Y%m%d')}{str(uuid.uuid4())[:6].upper()}",
+                "bookedAt": datetime.now().isoformat(),
+                "source": "doctor_ai"
+            }
+            
+            # Check for conflicts
+            existing = next((apt for apt in appointments 
+                           if apt.get("time") == params["time"] and 
+                           apt.get("doctor_id") == doctor_id), None)
+            
+            if existing:
+                return jsonify({
+                    "response": f"❌ Cannot add appointment. {params['time']} is already booked for {existing['patient']}."
+                })
+            
+            appointments.append(appointment)
+            
+            # Try to add to Google Calendar
+            try:
+                # For doctor-added appointments, create a simple patient info structure
+                patient_info = {
+                    "firstName": params["patient"].split()[0],
+                    "lastName": params["patient"].split()[-1] if len(params["patient"].split()) > 1 else "",
+                    "email": "patient@example.com",  # Placeholder
+                    "phone": "N/A",
+                    "age": "N/A",
+                    "gender": "N/A"
+                }
+                
+                google_event_id = create_google_calendar_event(patient_info, params["time"], params["reason"])
+                if google_event_id:
+                    appointment["google_event_id"] = google_event_id
+            except Exception as e:
+                print(f"Failed to add to Google Calendar: {e}")
+            
+            return jsonify({
+                "response": f"✅ Appointment added successfully! {params['patient']} scheduled for {params['time']} - {params['reason']}. Also added to Google Calendar."
+            })
+        
+        elif action == "modify":
+            # Modify existing appointment
+            old_appointment = next((apt for apt in appointments 
+                                  if apt.get("time") == params["old_time"] and 
+                                  apt.get("doctor_id") == doctor_id), None)
+            
+            if not old_appointment:
+                return jsonify({
+                    "response": f"❌ No appointment found at {params['old_time']}."
+                })
+            
+            # Check if new time is available
+            existing = next((apt for apt in appointments 
+                           if apt.get("time") == params["new_time"] and 
+                           apt.get("doctor_id") == doctor_id), None)
+            
+            if existing:
+                return jsonify({
+                    "response": f"❌ Cannot reschedule. {params['new_time']} is already booked."
+                })
+            
+            # Update the appointment
+            old_appointment["time"] = params["new_time"]
+            
+            return jsonify({
+                "response": f"✅ Appointment rescheduled from {params['old_time']} to {params['new_time']}."
+            })
+        
+        elif action == "delete":
+            # Delete appointment
+            appointment = next((apt for apt in appointments 
+                              if apt.get("time") == params["time"] and 
+                              apt.get("doctor_id") == doctor_id), None)
+            
+            if not appointment:
+                return jsonify({
+                    "response": f"❌ No appointment found at {params['time']}."
+                })
+            
+            # Remove from list
+            appointments.remove(appointment)
+            
+            return jsonify({
+                "response": f"✅ Appointment at {params['time']} has been cancelled."
+            })
+        
+        elif action == "block":
+            # Block time (add as blocked appointment)
+            block_appointment = {
+                "patient": "BLOCKED TIME",
+                "time": params["time"],
+                "reason": "Time blocked by doctor",
+                "location": "Doctor Blocked",
+                "doctor_id": doctor_id,
+                "status": "blocked",
+                "confirmationId": f"BL{datetime.now().strftime('%Y%m%d')}{str(uuid.uuid4())[:6].upper()}",
+                "bookedAt": datetime.now().isoformat(),
+                "source": "doctor_ai"
+            }
+            
+            appointments.append(block_appointment)
+            
+            return jsonify({
+                "response": f"✅ Time blocked: {params['time']}. No appointments can be scheduled during this time."
+            })
+        
+        else:
+            # No specific action recognized, try general AI response
+            return jsonify({
+                "response": f"I understand you want to: '{message}'. Please use commands like:\n• 'Add appointment for John on Monday 3pm for checkup'\n• 'Reschedule Friday 10am to Friday 2pm'\n• 'Cancel the Saturday appointment'\n• 'Block tomorrow from 2pm to 4pm'"
+            })
+            
+    except Exception as e:
+        print(f"Error in clinic AI: {e}")
+        return jsonify({
+            "response": f"Sorry, I encountered an error: {str(e)}"
+        })
+
+# Email system endpoints
+@app.route('/api/email-status', methods=['GET'])
+@login_required
+def email_status():
+    """Check if email system is properly configured"""
+    try:
+        if not EMAIL_SERVICE_AVAILABLE:
+            return jsonify({
+                "configured": False,
+                "error": "Email service not available - missing utils/email_notifications.py"
+            })
+        
+        # Check if SendGrid API key is configured
+        sendgrid_configured = bool(email_service.sg_api_key)
+        
+        # Check if from email is configured
+        from_email_configured = bool(email_service.from_email)
+        
+        return jsonify({
+            "configured": sendgrid_configured and from_email_configured,
+            "sendgrid_key": sendgrid_configured,
+            "from_email": from_email_configured,
+            "clinic_name": email_service.clinic_name,
+            "clinic_phone": email_service.clinic_phone
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "configured": False,
+            "error": str(e)
+        })
+
+@app.route('/api/send-reminder/<appointment_id>', methods=['POST'])
+@login_required
+def send_appointment_reminder(appointment_id):
+    """Send appointment reminder email"""
+    if not EMAIL_SERVICE_AVAILABLE:
+        return jsonify({
+            "success": False,
+            "error": "Email service not available"
+        })
+    
+    try:
+        # Find the appointment
+        appointment = next((apt for apt in appointments 
+                          if apt.get("confirmationId") == appointment_id), None)
+        
+        if not appointment:
+            return jsonify({
+                "success": False,
+                "error": "Appointment not found"
+            })
+        
+        # Get hours before from request (default 24)
+        hours_before = request.json.get('hours_before', 24)
+        
+        # Send reminder email
+        patient_info = appointment.get('patientInfo', {})
+        if not patient_info.get('email'):
+            return jsonify({
+                "success": False,
+                "error": "No email address found for this patient"
+            })
+        
+        appointment_details = {
+            "time": appointment['time'],
+            "reason": appointment['reason'],
+            "confirmationId": appointment['confirmationId']
+        }
+        
+        reminder_sent = email_service.send_appointment_reminder(
+            patient_info, appointment_details, hours_before
+        )
+        
+        return jsonify({
+            "success": reminder_sent,
+            "message": "Reminder sent successfully" if reminder_sent else "Failed to send reminder"
+        })
+        
+    except Exception as e:
+        print(f"❌ Error sending reminder: {e}")
+        return jsonify({
+            "success": False,
+            "error": "Failed to send reminder"
+        })
+
+@app.route('/api/test-email', methods=['POST'])
+@login_required
+def test_email():
+    """Test email functionality with sample data"""
+    if not EMAIL_SERVICE_AVAILABLE:
+        return jsonify({
+            "success": False,
+            "error": "Email service not available"
+        })
+    
+    try:
+        # Sample patient info for testing
+        test_patient_info = {
+            "firstName": "John",
+            "lastName": "Doe",
+            "age": 35,
+            "gender": "male",
+            "email": request.json.get('test_email', 'test@example.com'),
+            "phone": "(555) 123-4567",
+            "medicalId": "TEST12345",
+            "allergies": "Penicillin"
+        }
+        
+        test_appointment_details = {
+            "time": "Tomorrow 10:00 AM",
+            "reason": "Annual checkup",
+            "confirmationId": "TEST123456"
+        }
+        
+        email_type = request.json.get('type', 'confirmation')
+        
+        if email_type == 'confirmation':
+            result = email_service.send_appointment_confirmation(
+                test_patient_info, test_appointment_details
+            )
+        elif email_type == 'reminder':
+            result = email_service.send_appointment_reminder(
+                test_patient_info, test_appointment_details, 24
+            )
+        elif email_type == 'doctor_notification':
+            doctor_email = request.json.get('doctor_email', 'test.doctor@example.com')
+            result = email_service.send_doctor_notification(
+                doctor_email, test_patient_info, test_appointment_details
+            )
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Invalid email type. Use: confirmation, reminder, or doctor_notification"
+            })
+        
+        return jsonify({
+            "success": result,
+            "message": f"Test {email_type} email {'sent' if result else 'failed'}"
+        })
+        
+    except Exception as e:
+        print(f"❌ Error testing email: {e}")
+        return jsonify({
+            "success": False,
+            "error": f"Email test failed: {str(e)}"
+        })
+
+@app.route('/api/send-bulk-reminders', methods=['POST'])
+@login_required
+def send_bulk_reminders():
+    """Send reminder emails to all patients with appointments in next 24 hours"""
+    if not EMAIL_SERVICE_AVAILABLE:
+        return jsonify({
+            "success": False,
+            "error": "Email service not available"
+        })
+    
+    try:
+        current_time = datetime.now()
+        tomorrow = current_time + timedelta(hours=24)
+        
+        # Find appointments in next 24 hours
+        upcoming_appointments = []
+        for appointment in appointments:
+            # Simple time parsing - you might want to improve this
+            appointment_time_str = appointment.get('time', '')
+            
+            # Check if appointment is tomorrow or within 24 hours
+            if ('tomorrow' in appointment_time_str.lower() or 
+                'friday' in appointment_time_str.lower() or
+                'saturday' in appointment_time_str.lower() or
+                'sunday' in appointment_time_str.lower()):
+                
+                patient_info = appointment.get('patientInfo')
+                if patient_info and patient_info.get('email'):
+                    upcoming_appointments.append(appointment)
+        
+        sent_count = 0
+        failed_count = 0
+        
+        for appointment in upcoming_appointments:
+            patient_info = appointment['patientInfo']
+            appointment_details = {
+                "time": appointment['time'],
+                "reason": appointment['reason'],
+                "confirmationId": appointment['confirmationId']
+            }
+            
+            # Send reminder email
+            success = email_service.send_appointment_reminder(
+                patient_info, appointment_details, hours_before=24
+            )
+            
+            if success:
+                sent_count += 1
+            else:
+                failed_count += 1
+        
+        return jsonify({
+            "success": True,
+            "sent_count": sent_count,
+            "failed_count": failed_count,
+            "total_eligible": len(upcoming_appointments),
+            "message": f"Sent {sent_count} reminder emails, {failed_count} failed"
+        })
+        
+    except Exception as e:
+        print(f"❌ Error sending bulk reminders: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        })
+
+@app.route('/api/cancel-appointment', methods=['POST'])
+def cancel_appointment():
+    """Cancel appointment and send notification email"""
+    try:
+        data = request.json
+        confirmation_id = data.get('confirmationId')
+        
+        if not confirmation_id:
+            return jsonify({
+                "success": False,
+                "error": "Confirmation ID required"
+            })
+        
+        # Find and remove the appointment
+        appointment = None
+        for i, apt in enumerate(appointments):
+            if apt.get("confirmationId") == confirmation_id:
+                appointment = appointments.pop(i)
+                break
+        
+        if not appointment:
+            return jsonify({
+                "success": False,
+                "error": "Appointment not found"
+            })
+        
+        # Send cancellation email to patient
+        patient_info = appointment.get('patientInfo', {})
+        cancellation_sent = False
+        if EMAIL_SERVICE_AVAILABLE and patient_info.get('email'):
+            cancellation_sent = send_cancellation_email(patient_info, appointment)
+        
+        # Delete from Google Calendar if event exists
+        if appointment.get('google_event_id'):
+            try:
+                delete_google_calendar_event(appointment['google_event_id'])
+            except Exception as e:
+                print(f"⚠️ Failed to delete Google Calendar event: {e}")
+        
+        return jsonify({
+            "success": True,
+            "message": "Appointment cancelled successfully",
+            "cancellationEmailSent": cancellation_sent
+        })
+        
+    except Exception as e:
+        print(f"❌ Error cancelling appointment: {e}")
+        return jsonify({
+            "success": False,
+            "error": "Failed to cancel appointment"
+        })
+
+def send_cancellation_email(patient_info, appointment):
+    """Send appointment cancellation email"""
+    if not EMAIL_SERVICE_AVAILABLE:
+        return False
+    
+    try:
+        subject = f"❌ Appointment Cancelled - {appointment['time']}"
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                .container {{ max-width: 600px; margin: 0 auto; background: white; }}
+                .header {{ background: #dc3545; color: white; padding: 20px; text-align: center; }}
+                .content {{ padding: 30px; }}
+                .cancellation-box {{ background: #f8d7da; border: 1px solid #dc3545; padding: 20px; border-radius: 8px; margin: 20px 0; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>❌ Appointment Cancelled</h1>
+                    <p>{email_service.clinic_name}</p>
+                </div>
+                
+                <div class="content">
+                    <p>Dear <strong>{patient_info['firstName']} {patient_info['lastName']}</strong>,</p>
+                    
+                    <div class="cancellation-box">
+                        <h3>Your appointment has been cancelled:</h3>
+                        <p><strong>Date & Time:</strong> {appointment['time']}</p>
+                        <p><strong>Reason:</strong> {appointment['reason']}</p>
+                        <p><strong>Confirmation ID:</strong> {appointment['confirmationId']}</p>
+                    </div>
+                    
+                    <p>If you need to reschedule, please contact us at {email_service.clinic_phone} or visit our website.</p>
+                    
+                    <p>Best regards,<br><strong>The {email_service.clinic_name} Team</strong></p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        from sendgrid import SendGridAPIClient
+        from sendgrid.helpers.mail import Mail, Email, To, Content
+        
+        message = Mail(
+            from_email=Email(email_service.from_email, email_service.clinic_name),
+            to_emails=To(patient_info['email']),
+            subject=subject,
+            html_content=Content("text/html", html_content)
+        )
+        
+        sg = SendGridAPIClient(api_key=email_service.sg_api_key)
+        response = sg.send(message)
+        
+        print(f"✅ Cancellation email sent to {patient_info['email']} | Status: {response.status_code}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error sending cancellation email: {e}")
+        return False
+
+def delete_google_calendar_event(event_id):
+    """Delete event from Google Calendar"""
+    service = get_google_calendar_service()
+    if not service:
+        return False
+    
+    try:
+        service.events().delete(calendarId='primary', eventId=event_id).execute()
+        print(f"✅ Deleted Google Calendar event: {event_id}")
+        return True
+    except Exception as e:
+        print(f"❌ Error deleting Google Calendar event: {e}")
+        return False
 
 @app.route('/clinic')
 @login_required
@@ -601,9 +1118,6 @@ def clinic_dashboard():
     google_connected = os.path.exists(token_file)
     
     return render_template("clinic.html", appointments=filtered, google_connected=google_connected)
-
-# Include all other existing routes...
-# (OAuth routes, clinic-ai, etc.)
 
 if __name__ == '__main__':
     app.run(debug=True)
